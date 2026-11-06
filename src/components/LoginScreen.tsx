@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
-import { db } from '../services/db';
 import { useAuthStore } from '../stores/authStore';
 import gsap from 'gsap';
+import { requestOTP, verifyOTP, OTPLoginError } from '../services/otp';
 
 export function LoginScreen() {
   const { login } = useAuthStore();
@@ -11,6 +11,10 @@ export function LoginScreen() {
   const [pin, setPin] = useState('');
   const [confirmPin, setConfirmPin] = useState('');
   const [pinStage, setPinStage] = useState<'none' | 'setup' | 'verify'>('none');
+  // OTP flow state
+  const [email, setEmail] = useState('');
+  const [otp, setOtp] = useState('');
+  const [otpStage, setOtpStage] = useState<'none' | 'enter-email' | 'verify'>('none');
 
   const containerRef = useRef<HTMLDivElement>(null);
   const cardRef = useRef<HTMLDivElement>(null);
@@ -52,26 +56,50 @@ export function LoginScreen() {
   const handleCloudLogin = async () => {
     setLoggingIn(true);
     setError('');
+    setEmail('');
+    setOtp('');
+    setOtpStage('enter-email');
     try {
-      const cloud = (db as any).cloud;
-      if (!cloud) {
-        setError('Dexie Cloud is not available in this build.');
+      // Step 1: Ask for email, send OTP
+      if (!email.trim()) {
+        setError('Please enter your email address.');
         triggerShake();
         return;
       }
-      if (!cloud.options) {
-        setError('Dexie Cloud is not configured in this build.');
+      if (!/\S+@\S+\.\S+/.test(email.trim())) {
+        setError('Please enter a valid email address.');
         triggerShake();
         return;
       }
-      // Trigger Dexie Cloud's built-in email+OTP dialog
-      await cloud.login();
+      await requestOTP(email.trim());
+      setOtpStage('verify');
+      setError('');
+    } catch (err) {
+      if (err instanceof OTPLoginError && err.status === 422) {
+        setError('Email not registered. Please register, or use a demo account.');
+      } else {
+        setError((err as Error).message || 'Login failed. Please try again.');
+      }
+      triggerShake();
+    } finally {
+      setLoggingIn(false);
+    }
+  };
+
+  const handleOTPVerify = async () => {
+    setLoggingIn(true);
+    setError('');
+    try {
+      if (!otp.trim() || otp.trim().length < 4) {
+        setError('Please enter the OTP sent to your email.');
+        triggerShake();
+        return;
+      }
+      await verifyOTP(email.trim(), otp.trim());
       // After OTP, handle based on role
       if (role === 'inventory') {
-        // Inventory staff: no PIN needed, log in directly
         login(role, '');
       } else {
-        // Cashier: show PIN stage (set up if no PIN, verify if PIN exists)
         const savedPin = typeof window !== 'undefined' ? localStorage.getItem('tindahan_cashier_pin_hash') : null;
         if (savedPin) {
           setPinStage('verify');
@@ -79,8 +107,12 @@ export function LoginScreen() {
           setPinStage('setup');
         }
       }
-    } catch (err: any) {
-      setError(err?.message || 'Login failed. Please try again.');
+    } catch (err) {
+      if (err instanceof OTPLoginError && err.status === 422) {
+        setError('OTP verification failed. Please check your email and try again.');
+      } else {
+        setError((err as Error).message || 'OTP verification failed. Please try again.');
+      }
       triggerShake();
     } finally {
       setLoggingIn(false);
@@ -146,8 +178,78 @@ export function LoginScreen() {
           <p className="text-slate-500 text-sm mt-1">Smart Sari-Sari POS & Inventory System</p>
         </div>
 
-        {/* Stage 1: Role Selection + Dexie Cloud OTP Login */}
-        {pinStage === 'none' && (
+        {/* Stage 1: Role Selection + Email + OTP */}
+        {otpStage === 'enter-email' && (
+          <div className="space-y-6">
+            <div>
+              <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">
+                Enter your email
+              </label>
+              <input
+                type="email"
+                value={email}
+                onChange={(e) => { setEmail(e.target.value); setError(''); }}
+                placeholder="you@store.com"
+                className="w-full px-4 py-3 border-2 border-slate-200 rounded-xl focus:border-amber-500 focus:outline-none focus:ring-2 focus:ring-amber-500/20"
+                autoComplete="email"
+                disabled={loggingIn}
+              />
+            </div>
+            {error && <p className="text-red-700 text-xs font-bold bg-red-50 p-2.5 rounded-xl border border-red-200">{error}</p>}
+            <button
+              type="button"
+              onClick={handleCloudLogin}
+              disabled={loggingIn}
+              className="w-full py-4 bg-amber-500 hover:bg-amber-600 text-slate-950 font-extrabold rounded-2xl shadow-lg transition-transform active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {loggingIn ? 'Sending OTP...' : 'Send OTP 📧'}
+            </button>
+            <p className="text-center text-xs text-slate-400">
+              Same email works for both Cashier and Inventory roles. Sync across multiple devices.
+            </p>
+          </div>
+        )}
+
+        {/* Stage 2: OTP Entry */}
+        {otpStage === 'verify' && (
+          <div className="space-y-6">
+            <div className="text-center">
+              <p className="text-slate-600 text-sm">We're sending an OTP to <strong>{email}</strong></p>
+              <p className="text-xs text-slate-400">Check your inbox and enter the 4-digit code</p>
+            </div>
+            <div className="flex gap-2 justify-center">
+              <input
+                type="text"
+                inputMode="numeric"
+                maxLength={4}
+                value={otp}
+                onChange={(e) => { setOtp(e.target.value.replace(/\D/g, '')); setError(''); }}
+                placeholder="XXXX"
+                className="w-24 h-14 text-center text-2xl font-bold border-2 border-slate-200 rounded-xl focus:border-amber-500 focus:outline-none focus:ring-2 focus:ring-amber-500/20"
+                disabled={loggingIn}
+              />
+            </div>
+            {error && <p className="text-red-700 text-xs font-bold bg-red-50 p-2.5 rounded-xl border border-red-200 text-center">{error}</p>}
+            <button
+              type="button"
+              onClick={handleOTPVerify}
+              disabled={loggingIn}
+              className="w-full py-4 bg-amber-500 hover:bg-amber-600 text-slate-950 font-extrabold rounded-2xl shadow-lg transition-transform active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {loggingIn ? 'Verifying...' : 'Verify & Continue ✓'}
+            </button>
+            <button
+              type="button"
+              onClick={() => { setOtpStage('enter-email'); setOtp(''); setError(''); }}
+              className="w-full py-2 text-sm text-slate-500 hover:text-slate-700 font-medium"
+            >
+              Back to Role Selection
+            </button>
+          </div>
+        )}
+
+        {/* Stage 3: Role Selection (pre-OTP) */}
+        {otpStage === 'none' && (
           <div className="space-y-6">
             <div>
               <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">
@@ -195,7 +297,7 @@ export function LoginScreen() {
               disabled={loggingIn}
               className="w-full py-4 bg-amber-500 hover:bg-amber-600 text-slate-950 font-extrabold rounded-2xl shadow-lg transition-transform active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {loggingIn ? 'Signing In...' : 'Sign In with Email + OTP 🚀'}
+              {loggingIn ? 'Preparing Login...' : 'Sign In with Email + OTP 🚀'}
             </button>
 
             <p className="text-center text-xs text-slate-400">
