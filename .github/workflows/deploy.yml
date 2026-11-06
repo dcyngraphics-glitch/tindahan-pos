@@ -4,18 +4,20 @@ on:
   push:
     branches: [main]
 
+permissions:
+  contents: write
+  pages: write
+
 jobs:
   build:
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
     steps:
       - uses: actions/checkout@v4
       - name: Setup Node
         uses: actions/setup-node@v3
         with:
           node-version: '20'
-          cache: 'npm'
+          cache: npm
       - name: Install dependencies
         run: npm ci
       - name: Build
