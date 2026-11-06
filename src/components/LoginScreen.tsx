@@ -8,6 +8,7 @@ export function LoginScreen() {
   const [role, setRole] = useState<'cashier' | 'inventory'>('cashier');
   const [error, setError] = useState('');
   const [loggingIn, setLoggingIn] = useState(false);
+  // Pin stage (sign-up only)
   const [pin, setPin] = useState('');
   const [confirmPin, setConfirmPin] = useState('');
   const [pinStage, setPinStage] = useState<'none' | 'setup' | 'verify'>('none');
@@ -54,6 +55,9 @@ export function LoginScreen() {
       });
     }
   };
+
+  // NOTE: Removed mount effect that pre-set PIN stage. PIN stage only appears
+  // after OTP verification during sign-up. Logout always returns to role select.
 
   const handleCloudLogin = async () => {
     setLoggingIn(true);
@@ -102,16 +106,15 @@ export function LoginScreen() {
         return;
       }
       await verifyOTP(email.trim(), otp.trim());
-      // After OTP, handle based on role
-      if (role === 'inventory') {
-        login(role, '');
+      if (mode === 'register') {
+        // Sign up: go to PIN setup
+        setPin('');
+        setConfirmPin('');
+        setPinStage('setup');
+        setOtpStage('none');
       } else {
-        const savedPin = typeof window !== 'undefined' ? localStorage.getItem('tindahan_cashier_pin_hash') : null;
-        if (savedPin) {
-          setPinStage('verify');
-        } else {
-          setPinStage('setup');
-        }
+        // Login: done (no PIN stage)
+        login(role, '');
       }
     } catch (err) {
       if (err instanceof OTPLoginError && err.status === 422) {
@@ -184,79 +187,7 @@ export function LoginScreen() {
           <p className="text-slate-500 text-sm mt-1">Smart Sari-Sari POS & Inventory System</p>
         </div>
 
-        {/* Stage 1: Role Selection + Email + OTP */}
-        {otpStage === 'enter-email' && (
-          <div className="space-y-6">
-            <div>
-              <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">
-                Enter your email
-              </label>
-              <input
-  type="email"
-  value={email}
-  onChange={(e) => { setEmail(e.target.value); setError(''); }}
-  placeholder="you@store.com"
-  className="w-full px-4 py-3 border-2 border-slate-200 rounded-xl focus:border-amber-500 focus:outline-none focus:ring-2 focus:ring-amber-500/20"
-  autoComplete="email"
-  aria-label="Email address"
-  disabled={loggingIn}
-/>
-            </div>
-            {error && <p className="text-red-700 text-xs font-bold bg-red-50 p-2.5 rounded-xl border border-red-200">{error}</p>}
-            <button
-              type="button"
-              onClick={handleCloudLogin}
-              disabled={loggingIn}
-              className="w-full py-4 bg-amber-500 hover:bg-amber-600 text-slate-950 font-extrabold rounded-2xl shadow-lg transition-transform active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {loggingIn ? 'Sending OTP...' : 'Send OTP 📧'}
-            </button>
-            <p className="text-center text-xs text-slate-400">
-              Same email works for both Cashier and Inventory roles. Sync across multiple devices.
-            </p>
-          </div>
-        )}
-
-        {/* Stage 2: OTP Entry */}
-        {otpStage === 'verify' && (
-          <div className="space-y-6">
-            <div className="text-center">
-              <p className="text-slate-600 text-sm">We're sending an OTP to <strong>{email}</strong></p>
-              <p className="text-xs text-slate-400">Check your inbox and enter the 4-digit code</p>
-            </div>
-            <div className="flex gap-2 justify-center">
-              <input
-  type="text"
-  inputMode="numeric"
-  maxLength={4}
-  value={otp}
-  onChange={(e) => { setOtp(e.target.value.replace(/\D/g, '')); setError(''); }}
-  placeholder="XXXX"
-  className="w-24 h-14 text-center text-2xl font-bold border-2 border-slate-200 rounded-xl focus:border-amber-500 focus:outline-none focus:ring-2 focus:ring-amber-500/20"
-  aria-label="OTP code"
-  disabled={loggingIn}
-/>
-            </div>
-            {error && <p className="text-red-700 text-xs font-bold bg-red-50 p-2.5 rounded-xl border border-red-200 text-center">{error}</p>}
-            <button
-              type="button"
-              onClick={handleOTPVerify}
-              disabled={loggingIn}
-              className="w-full py-4 bg-amber-500 hover:bg-amber-600 text-slate-950 font-extrabold rounded-2xl shadow-lg transition-transform active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {loggingIn ? 'Verifying...' : 'Verify & Continue ✓'}
-            </button>
-            <button
-              type="button"
-              onClick={() => { setOtpStage('enter-email'); setOtp(''); setError(''); }}
-              className="w-full py-2 text-sm text-slate-500 hover:text-slate-700 font-medium"
-            >
-              Back to Role Selection
-            </button>
-          </div>
-        )}
-
-        {/* Stage 3: Role Selection (pre-OTP) */}
+        {/* Stage 1: Role Selection + Mode Toggle */}
         {otpStage === 'none' && (
           <div className="space-y-6">
             <div>
@@ -353,7 +284,76 @@ export function LoginScreen() {
           </div>
         )}
 
-        {/* Stage 2: PIN Setup or Verification */}
+        {/* Stage 2: Enter Email */}
+        {otpStage === 'enter-email' && (
+          <div className="space-y-6">
+            <div>
+              <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">
+                Enter your email
+              </label>
+              <input
+                type="email"
+                value={email}
+                onChange={(e) => { setEmail(e.target.value); setError(''); }}
+                placeholder="you@store.com"
+                className="w-full px-4 py-3 border-2 border-slate-200 rounded-xl focus:border-amber-500 focus:outline-none focus:ring-2 focus:ring-amber-500/20"
+                autoComplete="email"
+                aria-label="Email address"
+                disabled={loggingIn}
+              />
+            </div>
+            {error && <p className="text-red-700 text-xs font-bold bg-red-50 p-2.5 rounded-xl border border-red-200">{error}</p>}
+            <button
+              type="button"
+              onClick={handleCloudLogin}
+              disabled={loggingIn}
+              className="w-full py-4 bg-amber-500 hover:bg-amber-600 text-slate-950 font-extrabold rounded-2xl shadow-lg transition-transform active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {loggingIn ? 'Sending OTP...' : 'Send OTP 📧'}
+            </button>
+          </div>
+        )}
+
+        {/* Stage 3: OTP Verification */}
+        {otpStage === 'verify' && (
+          <div className="space-y-6">
+            <div className="text-center">
+              <p className="text-slate-600 text-sm">We're sending an OTP to <strong>{email}</strong></p>
+              <p className="text-xs text-slate-400">Check your inbox and enter the 4-digit code</p>
+            </div>
+            <div className="flex gap-2 justify-center">
+              <input
+                type="text"
+                inputMode="numeric"
+                maxLength={4}
+                value={otp}
+                onChange={(e) => { setOtp(e.target.value.replace(/\D/g, '')); setError(''); }}
+                placeholder="XXXX"
+                className="w-24 h-14 text-center text-2xl font-bold border-2 border-slate-200 rounded-xl focus:border-amber-500 focus:outline-none focus:ring-2 focus:ring-amber-500/20"
+                aria-label="OTP code"
+                disabled={loggingIn}
+              />
+            </div>
+            {error && <p className="text-red-700 text-xs font-bold bg-red-50 p-2.5 rounded-xl border border-red-200 text-center">{error}</p>}
+            <button
+              type="button"
+              onClick={handleOTPVerify}
+              disabled={loggingIn}
+              className="w-full py-4 bg-amber-500 hover:bg-amber-600 text-slate-950 font-extrabold rounded-2xl shadow-lg transition-transform active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {loggingIn ? 'Verifying...' : 'Verify & Continue ✓'}
+            </button>
+            <button
+              type="button"
+              onClick={() => { setOtpStage('enter-email'); setOtp(''); setError(''); }}
+              className="w-full py-2 text-sm text-slate-500 hover:text-slate-700 font-medium"
+            >
+              Back to Role Selection
+            </button>
+          </div>
+        )}
+
+        {/* Stage 4: PIN Setup (Sign Up Only) */}
         {pinStage !== 'none' && (
           <form onSubmit={handlePinSubmit} className="space-y-4">
             <div>
@@ -370,12 +370,11 @@ export function LoginScreen() {
                     maxLength={1}
                     value={pin[i - 1] || ''}
                     onChange={(e) => {
-                      const val = e.target.value.replace(/\\D/g, '');
+                      const val = e.target.value.replace(/\D/g, '');
                       if (val.length <= 1) {
                         const newPin = pin.split('');
                         newPin[i - 1] = val;
                         setPin(newPin.join(''));
-                        // Auto-focus next input
                         if (val && i < 4) {
                           const nextInput = e.target.parentElement?.children[i];
                           if (nextInput && typeof (nextInput as any).focus === 'function') {
