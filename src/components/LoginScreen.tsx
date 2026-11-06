@@ -192,14 +192,15 @@ export function LoginScreen() {
                 Enter your email
               </label>
               <input
-                type="email"
-                value={email}
-                onChange={(e) => { setEmail(e.target.value); setError(''); }}
-                placeholder="you@store.com"
-                className="w-full px-4 py-3 border-2 border-slate-200 rounded-xl focus:border-amber-500 focus:outline-none focus:ring-2 focus:ring-amber-500/20"
-                autoComplete="email"
-                disabled={loggingIn}
-              />
+  type="email"
+  value={email}
+  onChange={(e) => { setEmail(e.target.value); setError(''); }}
+  placeholder="you@store.com"
+  className="w-full px-4 py-3 border-2 border-slate-200 rounded-xl focus:border-amber-500 focus:outline-none focus:ring-2 focus:ring-amber-500/20"
+  autoComplete="email"
+  aria-label="Email address"
+  disabled={loggingIn}
+/>
             </div>
             {error && <p className="text-red-700 text-xs font-bold bg-red-50 p-2.5 rounded-xl border border-red-200">{error}</p>}
             <button
@@ -225,15 +226,16 @@ export function LoginScreen() {
             </div>
             <div className="flex gap-2 justify-center">
               <input
-                type="text"
-                inputMode="numeric"
-                maxLength={4}
-                value={otp}
-                onChange={(e) => { setOtp(e.target.value.replace(/\D/g, '')); setError(''); }}
-                placeholder="XXXX"
-                className="w-24 h-14 text-center text-2xl font-bold border-2 border-slate-200 rounded-xl focus:border-amber-500 focus:outline-none focus:ring-2 focus:ring-amber-500/20"
-                disabled={loggingIn}
-              />
+  type="text"
+  inputMode="numeric"
+  maxLength={4}
+  value={otp}
+  onChange={(e) => { setOtp(e.target.value.replace(/\D/g, '')); setError(''); }}
+  placeholder="XXXX"
+  className="w-24 h-14 text-center text-2xl font-bold border-2 border-slate-200 rounded-xl focus:border-amber-500 focus:outline-none focus:ring-2 focus:ring-amber-500/20"
+  aria-label="OTP code"
+  disabled={loggingIn}
+/>
             </div>
             {error && <p className="text-red-700 text-xs font-bold bg-red-50 p-2.5 rounded-xl border border-red-200 text-center">{error}</p>}
             <button
@@ -298,6 +300,7 @@ export function LoginScreen() {
                     ? 'bg-amber-500 text-slate-950 shadow-md'
                     : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
                 }`}
+                aria-label={mode === 'login' ? 'Sign in with existing account' : 'Switch to sign up mode'}
               >
                 Sign In
               </button>
@@ -309,6 +312,7 @@ export function LoginScreen() {
                     ? 'bg-amber-500 text-slate-950 shadow-md'
                     : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
                 }`}
+                aria-label={mode === 'register' ? 'Sign up for a new account' : 'Switch to sign in mode'}
               >
                 Sign Up
               </button>
