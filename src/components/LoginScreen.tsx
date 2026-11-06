@@ -74,7 +74,14 @@ export function LoginScreen() {
     }
   };
 
-  const hashPin = (pin: string) => btoa(pin.split('').map(c => String.fromCharCode(c.charCodeAt(0) ^ 0x55)).join(''));
+  const hashPin = async (pin: string): Promise<string> => {
+    const encoder = new TextEncoder();
+    const data = encoder.encode(pin);
+    const buffer = await crypto.subtle.digest('SHA-256', data);
+    return Array.from(new Uint8Array(buffer))
+      .map(b => b.toString(16).padStart(2, '0'))
+      .join('');
+  };
 
   const handlePinSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -92,19 +99,26 @@ export function LoginScreen() {
         triggerShake();
         return;
       }
-      // Save PIN hash
-      localStorage.setItem('tindahan_cashier_pin_hash', hashPin(trimmedPin));
-      localStorage.setItem('tindahan_cashier_pin', trimmedPin);
+      // Save PIN hash (SHA-256, cryptographic)
+      const pinHash = await hashPin(trimmedPin);
+      localStorage.setItem('tindahan_cashier_pin_hash', pinHash);
+      // NOTE: plaintext PIN removed. Only SHA-256 hash is stored.
       setPinStage('verify');
     } else if (pinStage === 'verify') {
       const savedHash = localStorage.getItem('tindahan_cashier_pin_hash');
-      if (!savedHash || hashPin(trimmedPin) !== savedHash) {
+      if (!savedHash) {
+        setError('No PIN set. Please set a PIN first.');
+        triggerShake();
+        return;
+      }
+      const enteredHash = await hashPin(trimmedPin);
+      if (enteredHash !== savedHash) {
         setError('Incorrect PIN. Please try again.');
         triggerShake();
         return;
       }
       // PIN verified, complete login
-      login(role, ''); // email no longer needed in auth store
+      login(role, '');
     }
   };
 

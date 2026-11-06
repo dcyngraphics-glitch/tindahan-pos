@@ -120,6 +120,10 @@ export function CashierScreen() {
   useBarcodeScannerListener(handleScan);
 
   const handleCheckout = async () => {
+    if (items.length === 0) {
+      showToast('Add items to checkout first.');
+      return;
+    }
     const cash = parseFloat(cashTendered);
     if (isNaN(cash) || cash * 100 < total) {
       showToast('Insufficient cash');
@@ -410,7 +414,7 @@ export function CashierScreen() {
                     onChange={e => {
                       setDiscountValue(e.target.value);
                       const v = parseFloat(e.target.value);
-                      setDiscount(isNaN(v) || v <= 0 ? null : { type: discountType, value: discountType === 'percent' ? v : Number(v) });
+                      setDiscount(isNaN(v) || v <= 0 ? null : { type: discountType, value: discountType === 'percent' ? v : Math.round(Number(v) * 100) });
                     }}
                     placeholder={discountType === 'percent' ? '0%' : '0.00'}
                     className="flex-1 min-h-[44px] px-4 py-2 rounded-xl border-2 border-slate-200 font-bold focus:outline-none focus:border-amber-500"
@@ -715,7 +719,7 @@ export function CashierScreen() {
                   onChange={e => {
                     setDiscountValue(e.target.value);
                     const v = parseFloat(e.target.value);
-                    setDiscount(isNaN(v) || v <= 0 ? null : { type: discountType, value: discountType === 'percent' ? v : Number(v) });
+                    setDiscount(isNaN(v) || v <= 0 ? null : { type: discountType, value: discountType === 'percent' ? v : Math.round(Number(v) * 100) });
                   }}
                   placeholder={discountType === 'percent' ? '0%' : '0.00'}
                   className="flex-1 min-h-[44px] px-4 py-2 rounded-xl border-2 border-slate-200 font-bold focus:outline-none focus:border-amber-500"

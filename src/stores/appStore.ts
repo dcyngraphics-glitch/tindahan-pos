@@ -8,10 +8,13 @@ interface AppState {
 }
 
 function loadMode(): AppMode {
-  if (typeof window === 'undefined') return 'cashier';
-  const saved = window.localStorage.getItem('tindahan_app_mode');
-  if (saved === 'inventory' || saved === 'cashier' || saved === 'dashboard' || saved === 'scanner' || saved === 'history') {
-    return saved;
+  try {
+    const saved = window.localStorage.getItem('tindahan_app_mode');
+    if (saved === 'inventory' || saved === 'cashier' || saved === 'dashboard' || saved === 'scanner' || saved === 'history') {
+      return saved;
+    }
+  } catch {
+    // localStorage unavailable (private browsing, storage quota) — use default
   }
   return 'cashier';
 }

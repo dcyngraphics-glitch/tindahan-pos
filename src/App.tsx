@@ -19,7 +19,13 @@ export default function App() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [lowStockCount, setLowStockCount] = useState(0);
   const isTabletOrLarger = useIsAtLeast('tablet');
-  const isCustomerView = window.location.hash === '#customer';
+  const [isCustomerView, setIsCustomerView] = useState(window.location.hash === '#customer');
+
+  useEffect(() => {
+    const handleHashChange = () => setIsCustomerView(window.location.hash === '#customer');
+    window.addEventListener('hashchange', handleHashChange);
+    return () => window.removeEventListener('hashchange', handleHashChange);
+  }, []);
 
   useEffect(() => {
     seedCatalogIfEmpty().then(() => {
@@ -52,8 +58,8 @@ export default function App() {
       {/* Top Header Bar with Menu Button */}
       <header className="bg-white border-b border-slate-200 px-4 py-3 flex items-center justify-between sticky top-0 z-30 shadow-xs">
         <div className="flex items-center gap-3">
-          {/* Only show menu button for cashier staff on tablet/PC, or inventory staff on mobile when nav is closed */}
-          {(role === 'cashier' && isTabletOrLarger) || (role === 'inventory' && !isTabletOrLarger && !sidebarOpen) ? (
+          {/* Show menu button for cashier on tablet/PC, or for any mobile user to open navigation drawer */}
+          {(role === 'cashier' && isTabletOrLarger) || role === 'inventory' || !isTabletOrLarger ? (
             <button
               onClick={() => setSidebarOpen(true)}
               aria-label="Open menu"
@@ -64,14 +70,6 @@ export default function App() {
               {lowStockCount > 0 && (
                 <span className="absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full ring-2 ring-white" />
               )}
-            </button>
-          ) : role === 'inventory' && !isTabletOrLarger && !sidebarOpen ? (
-            <button
-              onClick={() => setSidebarOpen(true)}
-              aria-label="Open navigation menu"
-              className="w-9 h-9 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-700 flex items-center justify-center font-bold min-h-[44px] min-w-[44px] transition"
-            >
-              ☰
             </button>
           ) : null}
           <div>

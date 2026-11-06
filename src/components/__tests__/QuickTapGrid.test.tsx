@@ -50,7 +50,7 @@ describe('QuickTapGrid', () => {
     screen.getByRole('button', { name: /Add QuickTap/i }).click();
     await screen.findByText(/Manage QuickTap Products/);
     const modal = container.querySelector('.max-w-xl') as HTMLElement;
-    const search = modal.querySelector('input[placeholder*="Search all"]') as HTMLInputElement;
+    const search = modal.querySelector('input[placeholder*="Search products"]') as HTMLInputElement;
     fireEvent.change(search, { target: { value: 'Product b' } });
     expect(modal.textContent).toContain('Product b');
     expect(modal.textContent).not.toContain('Product a');

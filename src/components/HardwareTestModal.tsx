@@ -20,31 +20,8 @@ export function HardwareTestModal({ onClose }: HardwareTestModalProps) {
   const { isSerialConnected, setSerialScanner, disconnectSerialScanner } = useHardwareStore();
 
   useEffect(() => {
-    let buffer = '';
-    let lastKeyTime = Date.now();
-
-    const handleKeyDown = (e: KeyboardEvent) => {
-      const now = Date.now();
-      if (now - lastKeyTime > 300) {
-        buffer = '';
-      }
-      lastKeyTime = now;
-
-      if (e.key === 'Enter') {
-        if (buffer.trim().length > 0) {
-          const barcode = buffer.trim();
-          setLastScanned(barcode);
-          getProductByBarcode(barcode).then(prod => setProductMatch(prod || null));
-          buffer = '';
-          e.preventDefault();
-        }
-      } else if (e.key.length === 1) {
-        buffer += e.key;
-      }
-    };
-
-    window.addEventListener('keydown', handleKeyDown, true);
-    return () => window.removeEventListener('keydown', handleKeyDown, true);
+    // Manual input handling only (physical scanner via HID is captured by the
+    // input's own onKeyDown). No global keydown listener to avoid double-fire.
   }, []);
 
   const handleTestPrint = async () => {

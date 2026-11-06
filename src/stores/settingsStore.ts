@@ -48,7 +48,11 @@ export const useSettingsStore = create<SettingsState>((set) => {
     darkMode: savedDark,
     receiptConfig,
     setDarkMode: (darkMode) => {
-      localStorage.setItem('tindahan_dark_mode', String(darkMode));
+      try {
+        localStorage.setItem('tindahan_dark_mode', String(darkMode));
+      } catch {
+        // localStorage unavailable (private browsing, storage quota) — ignore
+      }
       if (darkMode) {
         document.documentElement.classList.add('dark');
       } else {
@@ -59,7 +63,11 @@ export const useSettingsStore = create<SettingsState>((set) => {
     updateReceiptConfig: (partial) => {
       set((state) => {
         const next = { ...state.receiptConfig, ...partial };
-        localStorage.setItem('tindahan_receipt_config', JSON.stringify(next));
+        try {
+          localStorage.setItem('tindahan_receipt_config', JSON.stringify(next));
+        } catch {
+          // localStorage unavailable (private browsing, storage quota) — keep in-memory only
+        }
         return { receiptConfig: next };
       });
     },

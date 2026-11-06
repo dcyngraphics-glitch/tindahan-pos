@@ -149,7 +149,7 @@ export const useCartStore = create<CartState>((set, get) => {
       const total = get().getTotal();
       const d = get().discount;
       if (!d) return total;
-      if (d.type === 'percent') return Math.round(total * (1 - d.value / 100));
+      if (d.type === 'percent') return Math.round(total * Math.max(0, 1 - d.value / 100));
       return Math.max(0, total - d.value);
     },
 

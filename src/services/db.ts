@@ -42,6 +42,8 @@ const db = new Dexie('TindahanPOS', { addons: [dexieCloud] }) as Dexie & {
 if (db.cloud) {
   db.cloud.configure({
     databaseUrl: 'https://zo7vbabeq.dexie.cloud',
+    // requireAuth: true requires Dexie Cloud identity configuration.
+    // If auth is not configured, writes will be blocked.
     requireAuth: true,
   });
 }

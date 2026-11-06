@@ -75,10 +75,16 @@ export async function createTransaction(
   // Apply discount to the stored total so DB and receipt are consistent
   if (discount) {
     if (discount.type === 'percent') {
-      effectiveTotal = Math.round(total * (1 - discount.value / 100));
+      effectiveTotal = Math.round(total * Math.max(0, 1 - discount.value / 100));
     } else {
       effectiveTotal = Math.max(0, total - discount.value);
     }
+  }
+
+  if (cashTendered < effectiveTotal) {
+    throw new Error(
+      `Cash tendered ($${cashTendered.toFixed(2)}) is less than effective total ($${effectiveTotal.toFixed(2)})`
+    );
   }
 
   const change = cashTendered - effectiveTotal;

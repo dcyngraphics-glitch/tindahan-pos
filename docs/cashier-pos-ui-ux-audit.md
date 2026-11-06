@@ -1,119 +1,106 @@
 # Cashier POS UI/UX Audit Report
 
-## Critical Issues (must fix)
-
-### 1. Mobile layout overlap: QuickTap Grid + Checkout Footer
-**Problem:** On mobile, the QuickTap Grid (line 636-638) and Checkout Footer (line 641-663) both occupy the bottom. The QuickTap Grid is `p-4 bg-white border-t border-slate-200` without `flex-1` or `overflow-hidden`, so it may be partially covered by the fixed footer.
-**Location:** CashierScreen.tsx lines 635-663 (mobile return block)
-**Fix:** Make QuickTap Grid `flex-1 overflow-hidden` and give the checkout footer `pb-24` so it doesn't cover the QuickTap Grid.
-
-### 2. Mobile cart items covered by fixed footer
-**Problem:** The cart items container (line 593) is `flex-1 overflow-y-auto p-4 space-y-3`. The checkout footer is `fixed bottom-0` (line 642). When scrolling, the footer covers the cart items. No `pb-24` on the cart items to prevent overlap.
-**Location:** CashierScreen.tsx lines 592-633
-**Fix:** Add `pb-24` to the cart items container and ensure the footer has proper `padding-bottom` on mobile.
-
-### 3. QuickTap Grid not scrollable on mobile
-**Problem:** The QuickTap Grid (line 636-638) is a flat `p-4` div without `flex-1` or `overflow-hidden`. It doesn't expand to fill the space and may be covered by the fixed footer.
-**Location:** CashierScreen.tsx lines 635-638
-**Fix:** Make the QuickTap Grid `flex-1 overflow-hidden` and add `pb-24` to the parent container.
-
-### 4. Receipt modal missing close button
-**Problem:** The receipt modal only has "Next Customer →" button. Users may want to close the receipt without printing.
-**Location:** CashierScreen.tsx lines 466-518 (receipt modal)
-**Fix:** Add a "Close" button.
-
-### 5. Void transaction without confirmation
-**Problem:** The void transaction button doesn't have a confirmation dialog. Users might accidentally void a transaction.
-**Location:** CashierScreen.tsx lines 797-802
-**Fix:** Add a confirmation modal for voiding.
+**Directed update (2026-11-06):** the mobile layout issues below were already fixed in the codebase —
+the old "Critical" labels no longer apply.
 
 ---
 
-## Moderate Issues (should fix)
+## Critical Issues — RESOLVED (already fixed)
+
+### 1. Mobile QuickTap Grid + Checkout Footer overlap — ✅ FIXED
+On mobile the QuickTap Grid (`p-4 bg-white border-t border-slate-200`) and the Checkout Footer
+(`px-4 py-2 ... fixed bottom-0`) both occupied the bottom. The QuickTap Grid is now `flex-1
+overflow-hidden`, and the checkout footer has `pb-24` so it never covers the QuickTap Grid.
+**Location:** `src/screens/CashierScreen.tsx` (mobile return block) — QuickTap `flex-1
+overflow-hidden` + footer `pb-24`.
+
+### 2. Mobile cart items covered by fixed footer — ✅ FIXED
+The cart items container now carries `pb-24` so scrolling does not let the fixed footer overlap it.
+**Location:** `src/screens/CashierScreen.tsx` — cart items container `flex-1 overflow-y-auto
+p-4 space-y-3 pb-24`.
+
+### 3. QuickTap Grid not scrollable on mobile — ✅ FIXED
+The QuickTap Grid is now `flex-1 overflow-hidden`, expanding to fill the available space with its
+own scroll for a long QuickTap list.
+**Location:** `src/screens/CashierScreen.tsx` — QuickTap Grid `flex-1 overflow-hidden`.
+
+### 4. Receipt modal missing "Close" button — ✅ FIXED
+The receipt modal now includes a "Close" button (in addition to "Next Customer →"), so users can
+close the receipt without printing.
+**Location:** `src/screens/CashierScreen.tsx` — receipt modal footer button row.
+
+### 5. Void transaction without confirmation — ✅ FIXED
+The void transaction button now shows a confirmation modal before restoring stock.
+**Location:** `src/screens/CashierScreen.tsx` — void (and void stock-restore) confirmation modal.
+
+---
+
+## Moderate Issues (still to fix)
 
 ### 6. Discount logic display could be clearer
-**Problem:** The discount display shows subtotal with line-through when discount is present, but the visual language might confuse users.
-**Location:** CashierScreen.tsx lines 369-371
-**Fix:** Show the discount as a separate line with clear labeling.
+The discount display shows the subtotal with line-through when a discount is present; the visual
+language may confuse users. Consider showing the discount as a separate, clearly labelled line.
+**Location:** `src/screens/CashierScreen.tsx` — discount block (subtotal + discounted total).
 
 ### 7. Discount input missing Enter key handling
-**Problem:** The discount input doesn't have `onKeyDown` for Enter key. Users might want to press Enter to confirm the discount.
-**Location:** CashierScreen.tsx lines 388-399
-**Fix:** Add `onKeyDown` handler for Enter key.
+The discount input has no `onKeyDown` for Enter. Users may want to press Enter to confirm the discount.
+**Location:** `src/screens/CashierScreen.tsx` — discount input.
 
 ### 8. Payment preset buttons lack visual feedback
-**Problem:** The preset payment buttons (₱20, ₱50, etc.) don't have a visual indicator when clicked.
-**Location:** CashierScreen.tsx lines 425-442
-**Fix:** Add a visual indicator (e.g., active state) when a preset amount is selected.
+The preset payment buttons (₱20, ₱50, etc.) don't indicate when one is selected. Add an active state.
+**Location:** `src/screens/CashierScreen.tsx` — preset payment button group.
 
 ### 9. Scanner activity count unclear
-**Problem:** The scanner activity count is shown in the header, but the user might not understand what the activity count means.
-**Location:** CashierScreen.tsx lines 231-234
-**Fix:** Add a tooltip or label explaining the activity count.
+The scanner activity count is shown in the header, but users may not know what it means. Add a
+tooltip/label.
+**Location:** `src/screens/CashierScreen.tsx` — scanner activity count in header.
 
 ### 10. Void transaction stock restore confirmation
-**Problem:** The void transaction restores stock immediately without confirmation. Users might accidentally void.
-**Location:** CashierScreen.tsx lines 204-215
-**Fix:** Add a confirmation modal.
+The void transaction restores stock immediately; a confirmation may be warranted for safety (separate
+from the void-transaction confirmation).
+**Location:** `src/screens/CashierScreen.tsx` — void stock restore handler.
 
 ---
 
-## Mobile Layout Fixes
+## Menu Button Regression — ⚠️ OPEN (new finding)
 
-### Implementation Plan:
+Found via `e2e/login-auth-nav.spec.ts`: the navigation **menu button** (⚙️/☰ button in the header)
+exhibits regressions on some screen states:
 
-1. **Cart items container**: Add `pb-24` to prevent overlap with fixed footer
-2. **QuickTap Grid**: Make `flex-1 overflow-hidden` to prevent overlap
-3. **Checkout footer**: Ensure proper `padding-bottom` on mobile
+- The menu button is **unreachable / does not toggle** on certain routes (e.g., after login,
+  navigating from history, from settings).
+- The sidebar feels **scratch-y** on tablet and mobile (transition/state jitter while swiping).
 
-### Code Changes:
-
-#### CashierScreen.tsx (mobile layout):
-
-```tsx
-{/* Cart Items - add pb-24 to prevent overlap with fixed footer */}
-<div className="flex-1 overflow-y-auto p-4 space-y-3 pb-24">
-  {/* ... cart items ... */}
-</div>
-
-{/* QuickTap Grid - make flex-1 to fill space */}
-<div className="flex-1 overflow-hidden pb-24">
-  <QuickTapGrid products={products} onProductsUpdated={() => getAllProducts().then(setProducts)} />
-</div>
-
-{/* Checkout Footer - mobile: fixed bottom-0 with proper padding */}
-<div className="p-4 bg-white border-t border-slate-200 shadow-2xl flex justify-between items-center fixed bottom-0 left-0 right-0 z-30">
-  {/* ... footer content ... */}
-</div>
-```
-
-#### CashierScreen.tsx (tablet layout - already fixed):
-The tablet layout already has the correct structure with the cart items container and footer separated. No changes needed.
+Affected file: `src/App.tsx` (menu button conditional render, lines 62–69) and
+`src/components/ModeNav.tsx` (side drawer open/close). **Status: needs fixing.** See
+`docs/bug-findings-report.md` Finding #1.
 
 ---
 
 ## Summary
 
-| Priority | Issue | Fix | Impact |
-|----------|-------|-----|--------|
-| 🔴 Critical | Mobile QuickTap + Footer overlap | Add `pb-24` to cart/QuickTap | High |
-| 🔴 Critical | Mobile cart covered by footer | Add `pb-24` to cart items | High |
-| 🔴 Critical | Mobile QuickTap not scrollable | Make `flex-1 overflow-hidden` | High |
-| 🔴 Critical | Receipt modal missing close | Add "Close" button | Medium |
-| 🟠 Moderate | Void confirmation | Add confirm dialog | High |
-| 🟠 Moderate | Discount display clarity | Improve visual | Low |
-| 🟡 Low | Discount Enter key | Add `onKeyDown` | Low |
-| 🟡 Low | Payment preset feedback | Add active state | Low |
-| 🟡 Low | Scanner activity label | Add tooltip | Low |
-| 🟡 Low | Void confirm dialog | Add modal | High |
+| Priority | Issue | Status |
+|----------|-------|--------|
+| 🔴 Critical | Mobile QuickTap + Footer overlap | ✅ Fixed |
+| 🔴 Critical | Mobile cart covered by footer | ✅ Fixed |
+| 🔴 Critical | Mobile QuickTap not scrollable | ✅ Fixed |
+| 🔴 Critical | Receipt modal missing close | ✅ Fixed |
+| 🔴 Critical | Void transaction without confirmation | ✅ Fixed |
+| 🟠 Moderate | Discount logic display clarity | ⏳ To fix |
+| 🟠 Moderate | Discount input Enter key | ⏳ To fix |
+| 🟠 Moderate | Payment preset visual feedback | ⏳ To fix |
+| 🟡 Low | Scanner activity label | ⏳ To fix |
+| 🟡 Low | Void stock restore confirmation | ⏳ To fix |
+| 🔴 Critical | **Menu button regression** (reachability/toggle/sticky drawer) | ⏳ **Open** |
 
-## Recommended Implementation Order:
+## Recommended Implementation Order
 
-1. **Mobile layout fixes** (Critical): Cart items `pb-24`, QuickTap `flex-1`, footer `pb-24`
-2. **Receipt modal close** (Critical): Add "Close" button
-3. **Void confirmation** (Critical): Add confirm dialog
-4. **Discount Enter key** (Moderate): Add `onKeyDown`
-5. **Payment preset feedback** (Low): Add active state
-6. **Scanner activity label** (Low): Add tooltip
+1. **Menu button regression** (Critical — new open finding): fix reachability, toggle, and sticky
+   drawer behavior in `src/App.tsx` + `src/components/ModeNav.tsx`.
+2. **Discount display clarity** (Moderate): show discount as a separate labelled line.
+3. **Discount Enter key** (Moderate): add `onKeyDown` to the discount input.
+4. **Payment preset feedback** (Low): add active state.
+5. **Scanner activity label** (Low): add tooltip.
+6. **Void stock restore confirmation** (Low): confirmation modal for stock restore.
 
-All changes are confined to `CashierScreen.tsx` and `QuickTapGrid.tsx`. No data model changes required.
+All mobile-layout fixes are confined to `src/screens/CashierScreen.tsx`.

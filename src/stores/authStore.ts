@@ -28,14 +28,28 @@ export function safeParseAuth(raw: string | null): { isAuthenticated: boolean; r
   }
 }
 
-const initialAuth = safeParseAuth(localStorage.getItem('tindahan_auth'));
+// Load auth state with try/catch for private browsing / storage unavailable
+export function loadAuthState(): { isAuthenticated: boolean; role: UserRole | null } {
+  try {
+    const raw = localStorage.getItem('tindahan_auth');
+    return safeParseAuth(raw);
+  } catch {
+    return { isAuthenticated: false, role: null };
+  }
+}
+
+const initialAuth = loadAuthState();
 
 export const useAuthStore = create<AuthState>((set) => ({
   isAuthenticated: initialAuth.isAuthenticated,
   role: initialAuth.role,
   login: (role, _email) => {
     const authState = { isAuthenticated: true, role };
-    localStorage.setItem('tindahan_auth', JSON.stringify(authState));
+    try {
+      localStorage.setItem('tindahan_auth', JSON.stringify(authState));
+    } catch {
+      // localStorage unavailable (private browsing, storage quota) — keep in-memory only
+    }
     // Inventory staff: land in Inventory list by default on mobile (scanner via nav)
     useAppStore.getState().setMode(role === 'inventory' ? 'inventory' : 'cashier');
     set(authState);

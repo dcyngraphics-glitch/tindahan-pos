@@ -29,18 +29,36 @@ export function DeveloperSettingsModal({ onClose }: DeveloperSettingsModalProps)
   const [newPinInput, setNewPinInput] = useState('');
   const [pinMessage, setPinMessage] = useState<{ text: string; error: boolean } | null>(null);
 
-  const handleChangePin = (e: React.FormEvent) => {
+  const hashPin = async (pin: string): Promise<string> => {
+    const encoder = new TextEncoder();
+    const data = encoder.encode(pin);
+    const buffer = await crypto.subtle.digest('SHA-256', data);
+    return Array.from(new Uint8Array(buffer))
+      .map(b => b.toString(16).padStart(2, '0'))
+      .join('');
+  };
+
+  const handleChangePin = async (e: React.FormEvent) => {
     e.preventDefault();
-    const storedPin = localStorage.getItem('tindahan_cashier_pin');
-    if (storedPin && currentPinInput !== storedPin) {
-      setPinMessage({ text: 'Current PIN is incorrect.', error: true });
+    // Only cashier can change cashier PIN; inventory staff cannot.
+    if (role !== 'cashier') {
+      setPinMessage({ text: 'Only Cashier role can change the cashier PIN.', error: true });
       return;
+    }
+    const storedHash = localStorage.getItem('tindahan_cashier_pin_hash');
+    if (storedHash) {
+      const currentHash = await hashPin(currentPinInput);
+      if (currentHash !== storedHash) {
+        setPinMessage({ text: 'Current PIN is incorrect.', error: true });
+        return;
+      }
     }
     if (!/^\d{4}$/.test(newPinInput)) {
       setPinMessage({ text: 'New PIN must be exactly 4 digits.', error: true });
       return;
     }
-    localStorage.setItem('tindahan_cashier_pin', newPinInput);
+    const newHash = await hashPin(newPinInput);
+    localStorage.setItem('tindahan_cashier_pin_hash', newHash);
     setCurrentPinInput('');
     setNewPinInput('');
     setPinMessage({ text: 'Cashier PIN updated successfully! ✓', error: false });

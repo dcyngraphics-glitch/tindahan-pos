@@ -1,13 +1,20 @@
 import { test, expect } from '@playwright/test';
 
 // Vite dev server runs here
-const BASE = 'http://localhost:5179/';
+const BASE = 'http://localhost:5173/';
 
 // Seed a persisted session WITHOUT auth so the login screen renders
 // (the cashier can then enter the "remembered" PIN to unlock the till).
 async function seedPinOnly(page: any, pin: string) {
-  await page.evaluate(({ pin }) => {
-    localStorage.setItem('tindahan_cashier_pin', pin);
+  await page.evaluate(async ({ pin }) => {
+    // PIN is hashed with SHA-256 before storage
+    const encoder = new TextEncoder();
+    const data = encoder.encode(pin);
+    const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+    const pinHash = Array.from(new Uint8Array(hashBuffer))
+      .map(b => b.toString(16).padStart(2, '0'))
+      .join('');
+    localStorage.setItem('tindahan_cashier_pin_hash', pinHash);
   }, { pin });
 }
 
@@ -20,25 +27,37 @@ async function seedSession(page: any, role: 'cashier' | 'inventory', email: stri
   }, { role, email, pin });
 }
 
-function loginAsCashier(page: any, email: string, pin: string) {
-  return async () => {
+function loginAsCashier(page: any, email: string) {
+  return async (pin: string) => {
     await page.click('button:has-text("Cashier")');
-    await page.fill('input[placeholder="e.g. tindera@sarisari.ph"]', email);
-    await page.fill('input[placeholder="Enter 4-digit PIN"]', pin);
-    await page.click('button:has-text("Start Shift as Cashier")');
+    await page.waitForSelector('input[type="email"]');
+    await page.fill('input[type="email"]', email);
+    await page.click('button:has-text("Verify OTP")');
+    await page.waitForSelector('input[autocomplete="one-time-code"]');
+    await page.fill('input[autocomplete="one-time-code"]', '123456');
+    await page.click('button:has-text("Submit OTP")');
+    for (let i = 0; i < 4; i++) {
+      await page.fill('input[type="password"]:nth-child(1) input', pin[i] || '');
+    }
+    await page.waitForTimeout(300);
+    await page.click('button:has-text("Set PIN & Continue")');
   };
 }
 
 function loginAsInventory(page: any, email: string) {
   return async () => {
     await page.click('button:has-text("Inventory Staff")');
-    await page.fill('input[placeholder="e.g. tindera@sarisari.ph"]', email);
-    await page.click('button:has-text("Start Shift as Inventory Staff")');
+    await page.waitForSelector('input[type="email"]');
+    await page.fill('input[type="email"]', email);
+    await page.click('button:has-text("Verify OTP")');
+    await page.waitForSelector('input[autocomplete="one-time-code"]');
+    await page.fill('input[autocomplete="one-time-code"]', '123456');
+    await page.click('button:has-text("Submit OTP")');
   };
 }
 
 async function openMenu(page: any) {
-  await page.click('button:has-text("☰")');
+  await page.click('button[aria-label="Open menu"]');
   await expect(page.locator('nav[role="navigation"]')).toBeVisible();
 }
 
@@ -54,10 +73,20 @@ test.describe('Login & Auth & Navigation Flow', () => {
 
   test('C-1  Cashier: first-time PIN setup & login', async ({ page }) => {
     await page.click('button:has-text("Cashier")');
-    await page.fill('input[placeholder="e.g. tindera@sarisari.ph"]', 'cashier@pos.ph');
-    await page.fill('input[placeholder="Create 4-digit PIN"]', '1234');
-    await page.fill('input[placeholder="Confirm 4-digit PIN"]', '1234');
-    await page.click('button:has-text("Start Shift as Cashier")');
+    await page.waitForSelector('input[type="email"]');
+    await page.fill('input[type="email"]', 'cashier@pos.ph');
+    await page.click('button:has-text("Verify OTP")');
+    await page.waitForSelector('input[autocomplete="one-time-code"]');
+    await page.fill('input[autocomplete="one-time-code"]', '123456');
+    await page.click('button:has-text("Submit OTP")');
+    for (let i = 0; i < 4; i++) {
+      await page.fill('input[type="password"]:nth-child(1) input', '1');
+    }
+    await page.click('button:has-text("Set PIN & Continue")');
+    for (let i = 0; i < 4; i++) {
+      await page.fill('input[type="password"]:nth-child(2) input', '1');
+    }
+    await page.click('button:has-text("Set PIN & Continue")');
     await expect(page.locator('h1:has-text("Cashier POS")')).toBeVisible();
     await expect(page.locator('text=cashier@pos.ph')).toBeVisible();
   });
@@ -65,29 +94,49 @@ test.describe('Login & Auth & Navigation Flow', () => {
   test('C-2  Cashier: PIN remembered (second login, no auth in store)', async ({ page }) => {
     await seedPinOnly(page, '5678');
     await page.goto(BASE);
-    await loginAsCashier(page, 'cashier2@pos.ph', '5678')();
+    await page.click('button:has-text("Cashier")');
+    await page.waitForSelector('input[type="email"]');
+    await page.fill('input[type="email"]', 'cashier2@pos.ph');
+    await page.click('button:has-text("Verify OTP")');
+    await page.waitForSelector('input[autocomplete="one-time-code"]');
+    await page.fill('input[autocomplete="one-time-code"]', '123456');
+    await page.click('button:has-text("Submit OTP")');
+    for (let i = 0; i < 4; i++) {
+      await page.fill('input[type="password"]:nth-child(1) input', '5');
+    }
+    await page.click('button:has-text("Unlock & Continue")');
     await expect(page.locator('h1:has-text("Cashier POS")')).toBeVisible();
   });
 
   test('C-3  Cashier: invalid email NOT accepted (form does not submit)', async ({ page }) => {
     await page.click('button:has-text("Cashier")');
-    await page.fill('input[placeholder="e.g. tindera@sarisari.ph"]', 'not-an-email');
-    await page.click('button:has-text("Start Shift as Cashier")');
-    // type="email" + required native validation blocks submission; login screen stays
+    await page.waitForSelector('input[type="email"]');
+    await page.fill('input[type="email"]', 'not-an-email');
+    await page.click('button:has-text("Verify OTP")');
     await expect(page.locator('h1:has-text("Tindahan ni Aling Puring")')).toBeVisible();
   });
 
   test('C-4  Cashier: wrong PIN rejected', async ({ page }) => {
     await seedPinOnly(page, '1111');
     await page.goto(BASE);
-    await loginAsCashier(page, 'cashier3@pos.ph', '9999')();
-    await expect(page.locator('text=Incorrect Cashier PIN. Please try again.')).toBeVisible();
+    await page.click('button:has-text("Cashier")');
+    await page.waitForSelector('input[type="email"]');
+    await page.fill('input[type="email"]', 'cashier3@pos.ph');
+    await page.click('button:has-text("Verify OTP")');
+    await page.waitForSelector('input[autocomplete="one-time-code"]');
+    await page.fill('input[autocomplete="one-time-code"]', '123456');
+    await page.click('button:has-text("Submit OTP")');
+    for (let i = 0; i < 4; i++) {
+      await page.fill('input[type="password"]:nth-child(1) input', '9');
+    }
+    await page.click('button:has-text("Unlock & Continue")');
+    await expect(page.locator('text=Incorrect PIN. Please try again.')).toBeVisible();
   });
 
   test('C-5  Cashier: empty email NOT accepted (form does not submit)', async ({ page }) => {
     await page.click('button:has-text("Cashier")');
-    await page.click('button:has-text("Start Shift as Cashier")');
-    // native validation blocks submission for empty required email
+    await page.waitForSelector('input[type="email"]');
+    await page.click('button:has-text("Verify OTP")');
     await expect(page.locator('h1:has-text("Tindahan ni Aling Puring")')).toBeVisible();
   });
 
@@ -125,61 +174,76 @@ test.describe('Login & Auth & Navigation Flow', () => {
 
   // ───────────────────────── SIDEBAR BEHAVIOR ─────────────────────────
 
-  test('S-1  Cashier on mobile: sidebar hidden, no menu button (unreachable)', async ({ page }) => {
+  test('S-1  Cashier on mobile: menu button visible, sidebar toggle works', async ({ page }) => {
     await page.click('button:has-text("Cashier")');
-    await page.fill('input[placeholder="e.g. tindera@sarisari.ph"]', 'cashier@pos.ph');
-    await page.fill('input[placeholder="Create 4-digit PIN"]', '1234');
-    await page.fill('input[placeholder="Confirm 4-digit PIN"]', '1234');
-    await page.click('button:has-text("Start Shift as Cashier")');
+    await page.waitForSelector('input[type="email"]');
+    await page.fill('input[type="email"]', 'cashier@pos.ph');
+    await page.click('button:has-text("Verify OTP")');
+    await page.waitForSelector('input[autocomplete="one-time-code"]');
+    await page.fill('input[autocomplete="one-time-code"]', '123456');
+    await page.click('button:has-text("Submit OTP")');
+    for (let i = 0; i < 4; i++) {
+      await page.fill('input[type="password"]:nth-child(1) input', '1');
+    }
+    await page.click('button:has-text("Unlock & Continue")');
+    await expect(page.locator('button[aria-label="Open menu"]')).toBeVisible();
     await expect(page.locator('nav[role="navigation"]')).toBeHidden();
-    await expect(page.locator('button[aria-label="Open menu"]')).toHaveCount(0);
+    await openMenu(page);
+    await expect(page.locator('nav[role="navigation"]')).toBeVisible();
   });
 
   test('S-2  Cashier on tablet: sidebar collapsible (menu button toggles)', async ({ page }) => {
     await page.setViewportSize({ width: 820, height: 1100 });
     await seedPinOnly(page, '1234');
     await page.goto(BASE);
-    await loginAsCashier(page, 'cashierT@pos.ph', '1234')();
-    // menu button present on tablet
+    await page.click('button:has-text("Cashier")');
+    await page.waitForSelector('input[type="email"]');
+    await page.fill('input[type="email"]', 'cashierT@pos.ph');
+    await page.click('button:has-text("Verify OTP")');
+    await page.waitForSelector('input[autocomplete="one-time-code"]');
+    await page.fill('input[autocomplete="one-time-code"]', '123456');
+    await page.click('button:has-text("Submit OTP")');
+    for (let i = 0; i < 4; i++) {
+      await page.fill('input[type="password"]:nth-child(1) input', '1');
+    }
+    await page.click('button:has-text("Unlock & Continue")');
     await expect(page.locator('button[aria-label="Open menu"]')).toBeVisible();
-    // sidebar hidden by default
     await expect(page.locator('nav[role="navigation"]')).toBeHidden();
-    // open
     await openMenu(page);
     await expect(page.locator('nav[role="navigation"]')).toBeVisible();
-    // close
     await page.click('button[aria-label="Close navigation menu"]');
     await expect(page.locator('nav[role="navigation"]')).toBeHidden();
-    // reopen
     await openMenu(page);
     await expect(page.locator('nav[role="navigation"]')).toBeVisible();
   });
 
   test('S-3  Inventory on mobile: sidebar visible by default; collapsible', async ({ page }) => {
     await page.click('button:has-text("Inventory Staff")');
-    await page.fill('input[placeholder="e.g. tindera@sarisari.ph"]', 'invMobile@pos.ph');
-    await page.click('button:has-text("Start Shift as Inventory Staff")');
-    // sidebar open by default
+    await page.waitForSelector('input[type="email"]');
+    await page.fill('input[type="email"]', 'invMobile@pos.ph');
+    await page.click('button:has-text("Verify OTP")');
+    await page.waitForSelector('input[autocomplete="one-time-code"]');
+    await page.fill('input[autocomplete="one-time-code"]', '123456');
+    await page.click('button:has-text("Submit OTP")');
     await expect(page.locator('nav[role="navigation"]')).toBeVisible();
-    // close it
     await page.click('button[aria-label="Close navigation menu"]');
     await expect(page.locator('nav[role="navigation"]')).toBeHidden();
-    // menu button now appears
-    await expect(page.locator('button:has-text("☰")')).toBeVisible();
-    // reopen
+    await expect(page.locator('button[aria-label="Open menu"]')).toBeVisible();
     await openMenu(page);
     await expect(page.locator('nav[role="navigation"]')).toBeVisible();
   });
 
-  test('S-4  Inventory on tablet: sidebar hidden with no way to open (BUG: unreachable)', async ({ page }) => {
+  test('S-4  Inventory on tablet: sidebar collapsible with menu button', async ({ page }) => {
     await page.setViewportSize({ width: 820, height: 1100 });
     await page.click('button:has-text("Inventory Staff")');
-    await page.fill('input[placeholder="e.g. tindera@sarisari.ph"]', 'invTab@pos.ph');
-    await page.click('button:has-text("Start Shift as Inventory Staff")');
-    // sidebar closed by default (only inventory-on-mobile auto-opens)
+    await page.waitForSelector('input[type="email"]');
+    await page.fill('input[type="email"]', 'invTab@pos.ph');
+    await page.click('button:has-text("Verify OTP")');
+    await page.waitForSelector('input[autocomplete="one-time-code"]');
+    await page.fill('input[autocomplete="one-time-code"]', '123456');
+    await page.click('button:has-text("Submit OTP")');
     await expect(page.locator('nav[role="navigation"]')).toBeHidden();
-    // NO menu button exists → cannot open nav
-    await expect(page.locator('button:has-text("☰")')).toHaveCount(0);
+    await expect(page.locator('button[aria-label="Open menu"]')).toBeVisible();
   });
 
   // ───────────────────────── MODE SWITCHING ─────────────────────────
@@ -188,7 +252,7 @@ test.describe('Login & Auth & Navigation Flow', () => {
     await page.setViewportSize({ width: 820, height: 1100 });
     await seedPinOnly(page, '1234');
     await page.goto(BASE);
-    await loginAsCashier(page, 'cashierM@pos.ph', '1234')();
+    await loginAsCashier(page, 'cashierM@pos.ph')('1234');
 
     // cashier modes: Cashier, History, Inventory, Dashboard
     const cashierModes = [
@@ -208,8 +272,12 @@ test.describe('Login & Auth & Navigation Flow', () => {
 
   test('M-2  Inventory: mode switching via sidebar (mobile)', async ({ page }) => {
     await page.click('button:has-text("Inventory Staff")');
-    await page.fill('input[placeholder="e.g. tindera@sarisari.ph"]', 'invM@pos.ph');
-    await page.click('button:has-text("Start Shift as Inventory Staff")');
+    await page.waitForSelector('input[type="email"]');
+    await page.fill('input[type="email"]', 'invM@pos.ph');
+    await page.click('button:has-text("Verify OTP")');
+    await page.waitForSelector('input[autocomplete="one-time-code"]');
+    await page.fill('input[autocomplete="one-time-code"]', '123456');
+    await page.click('button:has-text("Submit OTP")');
     // sidebar open by default
     await expect(page.locator('nav[role="navigation"]')).toBeVisible();
 
@@ -232,11 +300,16 @@ test.describe('Login & Auth & Navigation Flow', () => {
 
   test('L-1  Cashier logout: confirm, clears session, returns to login', async ({ page }) => {
     await page.click('button:has-text("Cashier")');
-    await page.fill('input[placeholder="e.g. tindera@sarisari.ph"]', 'logout@pos.ph');
-    await page.fill('input[placeholder="Create 4-digit PIN"]', '1234');
-    await page.fill('input[placeholder="Confirm 4-digit PIN"]', '1234');
-    await page.click('button:has-text("Start Shift as Cashier")');
-
+    await page.waitForSelector('input[type="email"]');
+    await page.fill('input[type="email"]', 'logout@pos.ph');
+    await page.click('button:has-text("Verify OTP")');
+    await page.waitForSelector('input[autocomplete="one-time-code"]');
+    await page.fill('input[autocomplete="one-time-code"]', '123456');
+    await page.click('button:has-text("Submit OTP")');
+    for (let i = 0; i < 4; i++) {
+      await page.fill('input[type="password"]:nth-child(1) input', '1');
+    }
+    await page.click('button:has-text("Unlock & Continue")');
     await expect(page.locator('text=logout@pos.ph')).toBeVisible();
     await expect(page.locator('button:has-text("Logout")')).toBeVisible();
 
@@ -255,11 +328,16 @@ test.describe('Login & Auth & Navigation Flow', () => {
 
   test('L-2  Logout from Dev Settings modal also logs out', async ({ page }) => {
     await page.click('button:has-text("Cashier")');
-    await page.fill('input[placeholder="e.g. tindera@sarisari.ph"]', 'logoutDev@pos.ph');
-    await page.fill('input[placeholder="Create 4-digit PIN"]', '1234');
-    await page.fill('input[placeholder="Confirm 4-digit PIN"]', '1234');
-    await page.click('button:has-text("Start Shift as Cashier")');
-
+    await page.waitForSelector('input[type="email"]');
+    await page.fill('input[type="email"]', 'logoutDev@pos.ph');
+    await page.click('button:has-text("Verify OTP")');
+    await page.waitForSelector('input[autocomplete="one-time-code"]');
+    await page.fill('input[autocomplete="one-time-code"]', '123456');
+    await page.click('button:has-text("Submit OTP")');
+    for (let i = 0; i < 4; i++) {
+      await page.fill('input[type="password"]:nth-child(1) input', '1');
+    }
+    await page.click('button:has-text("Unlock & Continue")');
     await page.click('button:has-text("Dev Settings")');
     await expect(page.locator('h2:has-text("Developer & Hardware Settings")')).toBeVisible();
 

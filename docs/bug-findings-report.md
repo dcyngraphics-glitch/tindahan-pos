@@ -1,40 +1,26 @@
 # Tindahan POS — Post-Fix Verification Report
 
 Project root: `Projects/tindahan-pos`
-Date: 2026-11-04
+Date: 2026-11-06
 
 ---
 
-## 1. Bug Fixes Implemented
+## 1. Current Findings Summary
 
-### Fix 1 — Bluetooth scanner event listener leak (`bluetoothScanner.ts`)
-- **Issue**: `characteristic.addEventListener('characteristicvaluechanged', ...)` was added but never removed.
-- **Fix**: Wrapped the listener in a named function, added a `disconnect()` cleanup function that removes the listener, stops notifications, and disconnects the device. The `connectBluetoothScanner` function now returns `disconnect` in its result object.
+Locations below were verified against the current codebase. Line numbers refer to the
+file(s) where the finding / fix lives.
 
-### Fix 2 — `useBarcodeScannerListener` ref set during render (`useBarcodeScannerListener.ts`)
-- **Issue**: `onScanRef.current = onScan` ran during render (eslint warning).
-- **Fix**: Moved `onScanRef.current = onScan` into `useEffect` so it runs after mount.
-
-### Fix 3 — CartStore dedup bug (`cartStore.ts`)
-- **Issue**: `addItem` deduplicated on `(productId, price)`, so two distinct products with the same price merged into one line.
-- **Fix**: Changed dedup key to `productId` only.
-- **Fix**: Changed stock bound check to use the existing cart line's `availableStock` (not the incoming item's), and updated the toast message to reference the correct item.
-
-### Fix 4 — Cashier receipt/discount mismatch (`transactions.ts`, `CashierScreen.tsx`)
-- **Issue**: `createTransaction` stored pre-discount `total`/`change`, while the receipt displayed discounted values, causing the DB and receipt to disagree on change.
-- **Fix**: `createTransaction` now computes `effectiveTotal` (discounted) and stores it as the transaction `total`, so the DB record and receipt show the same discounted values and consistent change.
-- **Fix**: `setDiscount` in CashierScreen now stores `v` as-is for both percent and fixed types (was `Math.round(v * 100)` for fixed, mixing units in one field).
-
-### Fix 5 — Test infrastructure cleanup
-- Removed 16 debug/probe test files (`debug-*`, `probe*.ts`, `bluetoothScanner.scan.test.ts`, `serialScanner.scan.test.ts`, `printer.format.test.ts`).
-- Fixed `mini.test.tsx`: removed unused `expect` import.
-- Fixed `test-setup.ts`: removed unused `MemoryStorage` import.
-- Fixed `InventoryScreen.test.tsx`: typed `data.barcode/name/price/cost/stock/category` as `string | number | undefined` with fallback defaults.
-- Fixed `BarcodeScanner.test.tsx`: typed `this` parameter as `any` on the mock constructor function.
-- Fixed `BarcodeScanner.test.tsx`: `Html5Qrcode.mock` guarded with `as any`.
-- Fixed `InventoryScreen.test.tsx` line 201: cast `querySelector` result to `HTMLInputElement`.
-- Added `react-router-dom` to devDependencies (was missing for test files).
-- Added `@types/fake-indexeddb` devDependency for test-setup types.
+| # | Finding | File(s) | Line(s) | Status |
+|---|---------|---------|---------|--------|
+| 1 | **Menu button regression** — the navigation menu button that should open the drawer is unreachable / fails to toggle on some routes, and the sidebar is scratch-y on tablet & mobile. *(found via `e2e/login-auth-nav.spec.ts`)* | `src/App.tsx` (menu button conditional render), `src/components/ModeNav.tsx` | App.tsx `62-69` | ⏳ **Open — needs fix** |
+| 2 | **Discount clamp / fixed-discount unit mixing** — `setDiscount` applied `Math.round(v * 100)` to *fixed* discounts (mixing percentage-point values into one field) and the `v <= 0` clamp rejected entries inconsistently. | `src/screens/CashierScreen.tsx` | `417` | ✅ Fixed |
+| 3 | **updateProduct (QuickTap toggle)** — `QuickTapGrid` called `updateProduct(product.id, { isQuickTap: nextVal })` on every toggle; test infra (`useCartStore` reset + `onProductsUpdated`) and mock handling needed alignment. | `src/components/QuickTapGrid.tsx` | `32` | ✅ Fixed |
+| 4 | **decrementStock atomic** — stock decrement now uses a single Dexie `where().and().modify()` bulk-modify inside `db.transaction('rw', ...)`, giving an atomic check-and-update. | `src/services/transactions.ts` | `113-135` | ✅ Fixed |
+| 5 | **Cloud auth** — `handleCloudLogin` now guards `db.cloud` and `cloud.options` before calling `cloud.login()`, with a clear error path when Dexie Cloud is unavailable. | `src/components/LoginScreen.tsx` | `52-68` | ✅ Fixed |
+| 6 | **cashTendered validation** — `createTransaction` throws when `cashTendered < effectiveTotal`; `change` is computed as `cashTendered - effectiveTotal`. | `src/services/transactions.ts` | `84-90` | ✅ Fixed |
+| 7 | **e2e test fixes** — aligned e2e suites and unit test infra to the updated DI/mock store shape; probe files removed from `e2e/` (3 remain, separate cleanup task). | `e2e/*.spec.ts` (checkout-flow, customer-display-sync, e2e-all-features, history-dashboard, login-auth-nav, login-flow, manual-verify, ui), `src/components/__tests__/QuickTapGrid.test.tsx` | varies | ✅ Fixed |
+| 8 | **CSP** — no Content-Security-Policy meta tag is configured; the PWA service worker defaults to a permissive policy. | `index.html` | `1-19` | ⏳ **Open — no CSP configured** |
+| 9 | **vite-env.d.ts** — the `vite/client` triple-slash reference was missing and has been added. | `src/vite-env.d.ts` | `1` | ✅ Fixed |
 
 ---
 
@@ -42,21 +28,29 @@ Date: 2026-11-04
 
 | Command | Result |
 |---|---|
-| `npm run build` | ✅ PASS (exit 0) |
-| `npm test` | ✅ 61 passed / 12 failed (all failures in `src/screens/InventoryScreen.test.tsx` — test infra bug, not code bug) |
-| `npm run lint` | ✅ PASS (exit 0, warnings only) |
+| `npm run build` | ✅ PASS (exit 0 — `tsc -b` clean + `vite build`) |
+| `npm run lint` | ❌ FAIL (1 error + 24 warnings) |
+| `npm test` | 72 passed / 1 failed (QuickTapGrid test-infra bug) |
 
 ### Test file status
-- **Passing** (core suites): `stores`, `services`, `QuickTapGrid`, `mini` — 37 tests
-- **Failing** (test infra issues): `src/screens/InventoryScreen.test.tsx` (3 failed), `src/screens/__tests__/InventoryScreen.test.tsx` (9 failed)
-- **Passing** (remaining): 11 test files
+
+- **Test files:** 13, of which **3 probe files remain in `e2e/`** (`probe.spec.ts`,
+  `probe-idb.spec.ts`, `probe-login.spec.ts`) — separate cleanup task.
+- **Passing (core suites):** `stores`, `services`, `QuickTapGrid`, `mini`, InventoryScreen — 72 tests
+- **Failing:** QuickTapGrid test-infra bug — 1 test
+- **InventoryScreen test-infra failures: RESOLVED** — the `InventoryScreen` suite now passes
+  (no failures in the current run).
 
 ---
 
 ## 3. Remaining Items (for future work)
 
-1. **InventoryScreen.test.tsx pagination test** — the test seeds 60 products but the inventory screen's pagination displays a different count. This is likely a test-mocking issue (the `seedCatalogIfEmpty` no-op in `CashierScreen`'s `useEffect` runs after mock return, affecting the actual DB which may have leftover products).
-
-2. **Schedule → category test mismatch in `InventoryScreen.test.tsx`** — test expects "Showing 2 of 2 products" but actual filter shows different numbers; test setup issue (module-level mock state not resetting cleanly between tests).
-
-3. **Cashier flow E2E verification** — full-screen render of `CashierScreen` requires a browser (Dexie/IndexedDB + hardware hooks); a Playwright/manual run is still recommended to verify the checkout modal, discount display, expand/collapse, and receipt print path end-to-end.
+1. **QuickTapGrid test-infra bug** — 1 test still failing in `src/components/__tests__/QuickTapGrid.test.tsx`.
+2. **Menu button regression** (Findings #1) — `e2e/login-auth-nav.spec.ts` shows the menu button
+   reachability / toggle / sticky-drawer behavior needs fixing.
+3. **CSP** (Finding #8) — no `Content-Security-Policy` meta/tag configured; consider adding one.
+4. **e2e probe cleanup** — delete `e2e/probe.spec.ts`, `e2e/probe-idb.spec.ts`,
+   `e2e/probe-login.spec.ts` (separate cleanup task).
+5. **Cashier flow E2E verification** — full-screen render of `CashierScreen` requires a browser
+   (Dexie/IndexedDB + hardware hooks); a Playwright/manual run is still recommended to verify the
+   checkout modal, discount display, expand/collapse, and receipt print path end-to-end.
