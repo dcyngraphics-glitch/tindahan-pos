@@ -66,6 +66,19 @@ export function LoginScreen() {
       }
       // Trigger Dexie Cloud's built-in email+OTP dialog
       await cloud.login();
+      // After OTP, handle based on role
+      if (role === 'inventory') {
+        // Inventory staff: no PIN needed, log in directly
+        login(role, '');
+      } else {
+        // Cashier: show PIN stage (set up if no PIN, verify if PIN exists)
+        const savedPin = typeof window !== 'undefined' ? localStorage.getItem('tindahan_cashier_pin_hash') : null;
+        if (savedPin) {
+          setPinStage('verify');
+        } else {
+          setPinStage('setup');
+        }
+      }
     } catch (err: any) {
       setError(err?.message || 'Login failed. Please try again.');
       triggerShake();
