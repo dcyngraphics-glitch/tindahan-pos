@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { useAuthStore } from '../stores/authStore';
 import gsap from 'gsap';
-import { requestOTP, verifyOTP, OTPLoginError } from '../services/otp';
+import { requestOTP, verifyOTP, registerOTP, OTPLoginError } from '../services/otp';
 
 export function LoginScreen() {
   const { login } = useAuthStore();
@@ -15,6 +15,8 @@ export function LoginScreen() {
   const [email, setEmail] = useState('');
   const [otp, setOtp] = useState('');
   const [otpStage, setOtpStage] = useState<'none' | 'enter-email' | 'verify'>('none');
+  // Sign Up vs Sign In mode
+  const [mode, setMode] = useState<'login' | 'register'>('login');
 
   const containerRef = useRef<HTMLDivElement>(null);
   const cardRef = useRef<HTMLDivElement>(null);
@@ -71,12 +73,16 @@ export function LoginScreen() {
         triggerShake();
         return;
       }
-      await requestOTP(email.trim());
+      if (mode === 'register') {
+        await registerOTP(email.trim());
+      } else {
+        await requestOTP(email.trim());
+      }
       setOtpStage('verify');
       setError('');
     } catch (err) {
       if (err instanceof OTPLoginError && err.status === 422) {
-        setError('Email not registered. Please register, or use a demo account.');
+        setError('Email not registered. Please register first, or use a demo account.');
       } else {
         setError((err as Error).message || 'Login failed. Please try again.');
       }
@@ -283,7 +289,32 @@ export function LoginScreen() {
               </div>
             </div>
 
-            <div className="bg-slate-50 p-3 rounded-xl border border-slate-200 text-xs text-slate-600 font-medium">
+            <div className="flex gap-2 justify-center">
+              <button
+                type="button"
+                onClick={() => { setMode('login'); setError(''); }}
+                className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${
+                  mode === 'login'
+                    ? 'bg-amber-500 text-slate-950 shadow-md'
+                    : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
+                }`}
+              >
+                Sign In
+              </button>
+              <button
+                type="button"
+                onClick={() => { setMode('register'); setError(''); }}
+                className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${
+                  mode === 'register'
+                    ? 'bg-amber-500 text-slate-950 shadow-md'
+                    : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
+                }`}
+              >
+                Sign Up
+              </button>
+            </div>
+
+            <div className="bg-slate-50 p-3 rounded-xl border border-slate-200 text-xs text-slate-600 font-medium mt-2">
               {role === 'cashier'
                 ? '💡 Access to Cashier Checkout, QuickTap, Transaction History, and Receipt Printing.'
                 : '📱 Access to Barcode Scanner, Inventory Catalog, and Analytics.'}
@@ -297,11 +328,23 @@ export function LoginScreen() {
               disabled={loggingIn}
               className="w-full py-4 bg-amber-500 hover:bg-amber-600 text-slate-950 font-extrabold rounded-2xl shadow-lg transition-transform active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {loggingIn ? 'Preparing Login...' : 'Sign In with Email + OTP 🚀'}
+              {loggingIn ? 'Preparing...' : (mode === 'register' ? 'Create Account 📧' : 'Sign In 🚀')}
             </button>
 
             <p className="text-center text-xs text-slate-400">
-              Same email works for both Cashier and Inventory roles. Sync across multiple devices.
+              {mode === 'register'
+                ? 'Already have an account? '
+                : 'New to Tindahan? '}
+              <button
+                type="button"
+                onClick={() => {
+                  setMode(mode === 'register' ? 'login' : 'register');
+                  setError('');
+                }}
+                className="text-amber-600 hover:text-amber-700 font-bold text-sm"
+              >
+                {mode === 'register' ? 'Sign In' : 'Sign Up'}
+              </button>
             </p>
           </div>
         )}
