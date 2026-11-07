@@ -488,7 +488,7 @@ export function CashierScreen() {
         {/* Receipt Modal */}
         {receipt && (
           <div className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4">
-            <div className="bg-white rounded-3xl max-w-md w-full p-8 shadow-2xl space-y-6">
+            <div className="printable-receipt bg-white rounded-3xl max-w-md w-full p-8 shadow-2xl space-y-6">
               <div className="text-center border-b pb-4">
                 <p className="text-4xl mb-2">🎉</p>
                 <h3 className="text-2xl font-black text-slate-900">Transaction Complete!</h3>
@@ -527,10 +527,7 @@ export function CashierScreen() {
                   {printing ? 'Connecting...' : '🖨️ Web Bluetooth Print'}
                 </button>
                 <button
-                  onClick={() => {
-                    document.body.classList.add('printing');
-                    window.print();
-                  }}
+                  onClick={() => window.print()}
                   className="w-full py-3 bg-slate-800 hover:bg-slate-900 text-white font-semibold rounded-xl transition flex items-center justify-center gap-2"
                 >
                   🖨️ Windows / System Print (All Printers)
@@ -772,7 +769,7 @@ export function CashierScreen() {
       {/* Receipt Modal */}
       {receipt && (
         <div className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl max-w-md w-full p-8 shadow-2xl space-y-6">
+          <div className="printable-receipt bg-white rounded-3xl max-w-md w-full p-8 shadow-2xl space-y-6">
             <div className="text-center border-b pb-4">
               <p className="text-4xl mb-2">🎉</p>
               <h3 className="text-2xl font-black text-slate-900">Transaction Complete!</h3>

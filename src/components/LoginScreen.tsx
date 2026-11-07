@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { useAuthStore } from '../stores/authStore';
 import gsap from 'gsap';
-import { requestOTP, verifyOTP, registerOTP, OTPLoginError } from '../services/otp';
+import { db } from '../services/db';
 
 export function LoginScreen() {
   const { login } = useAuthStore();
@@ -11,11 +11,8 @@ export function LoginScreen() {
   // Pin stage (sign-up only)
   const [pin, setPin] = useState('');
   const [confirmPin, setConfirmPin] = useState('');
-  const [pinStage, setPinStage] = useState<'none' | 'setup' | 'verify'>('none');
-  // OTP flow state
-  const [email, setEmail] = useState('');
-  const [otp, setOtp] = useState('');
-  const [otpStage, setOtpStage] = useState<'none' | 'enter-email' | 'verify'>('none');
+  // OTP stage: 'none' or 'enter-email' (OTP entry handled by Dexie Cloud dialog)
+  const [otpStage, setOtpStage] = useState<'none' | 'enter-email'>('none');
   // Sign Up vs Sign In mode
   const [mode, setMode] = useState<'login' | 'register'>('login');
 
@@ -52,66 +49,22 @@ export function LoginScreen() {
   const handleCloudLogin = async () => {
     setLoggingIn(true);
     setError('');
-    setEmail('');
-    setOtp('');
     setOtpStage('enter-email');
     try {
-      // Step 1: Ask for email, send OTP
-      if (!email.trim()) {
-        setError('Please enter your email address.');
-        triggerShake();
-        return;
-      }
-      if (!/\S+@\S+\.\S+/.test(email.trim())) {
-        setError('Please enter a valid email address.');
-        triggerShake();
-        return;
-      }
-      if (mode === 'register') {
-        await registerOTP(email.trim());
-      } else {
-        await requestOTP(email.trim());
-      }
-      setOtpStage('verify');
-      setError('');
-    } catch (err) {
-      if (err instanceof OTPLoginError && err.status === 422) {
-        setError('Email not registered. Please register first, or use a demo account.');
-      } else {
-        setError((err as Error).message || 'Login failed. Please try again.');
-      }
-      triggerShake();
-    } finally {
-      setLoggingIn(false);
-    }
-  };
-
-  const handleOTPVerify = async () => {
-    setLoggingIn(true);
-    setError('');
-    try {
-      if (!otp.trim() || otp.trim().length < 4) {
-        setError('Please enter the OTP sent to your email.');
-        triggerShake();
-        return;
-      }
-      await verifyOTP(email.trim(), otp.trim());
+      // Trigger the built-in Dexie Cloud OTP dialog
+      await db.cloud.login();
+      // After OTP verification, continue based on mode
       if (mode === 'register') {
         // Sign up: go to PIN setup
         setPin('');
         setConfirmPin('');
-        setPinStage('setup');
         setOtpStage('none');
       } else {
         // Login: done (no PIN stage)
         login(role, '');
       }
-    } catch (err) {
-      if (err instanceof OTPLoginError && err.status === 422) {
-        setError('OTP verification failed. Please check your email and try again.');
-      } else {
-        setError((err as Error).message || 'OTP verification failed. Please try again.');
-      }
+    } catch (err: any) {
+      setError(err?.message || 'Login failed. Please check your email and try again.');
       triggerShake();
     } finally {
       setLoggingIn(false);
@@ -130,28 +83,18 @@ export function LoginScreen() {
   const handlePinSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const trimmedPin = pin.trim();
-    
+
     if (!/^\d{4}$/.test(trimmedPin)) {
       setError('PIN must be exactly 4 digits.');
       triggerShake();
       return;
     }
 
-    if (pinStage === 'setup') {
-      if (trimmedPin !== confirmPin) {
-        setError('PINs do not match. Please verify.');
-        triggerShake();
-        return;
-      }
-      // Save PIN hash (SHA-256, cryptographic)
-      const pinHash = await hashPin(trimmedPin);
-      localStorage.setItem('tindahan_cashier_pin_hash', pinHash);
-      // NOTE: plaintext PIN removed. Only SHA-256 hash is stored.
-      setPinStage('verify');
-    } else if (pinStage === 'verify') {
+    if (mode !== 'register') {
+      // Login: just verify the PIN against the stored hash
       const savedHash = localStorage.getItem('tindahan_cashier_pin_hash');
       if (!savedHash) {
-        setError('No PIN set. Please set a PIN first.');
+        setError('No PIN set. Please use Sign Up to create an account first.');
         triggerShake();
         return;
       }
@@ -163,7 +106,20 @@ export function LoginScreen() {
       }
       // PIN verified, complete login
       login(role, '');
+      return;
     }
+
+    // Sign up: PIN setup
+    if (trimmedPin !== confirmPin) {
+      setError('PINs do not match. Please verify.');
+      triggerShake();
+      return;
+    }
+    // Save PIN hash (SHA-256, cryptographic)
+    const pinHash = await hashPin(trimmedPin);
+    localStorage.setItem('tindahan_cashier_pin_hash', pinHash);
+    // NOTE: plaintext PIN removed. Only SHA-256 hash is stored.
+    setOtpStage('none');
   };
 
   return (
@@ -274,50 +230,27 @@ export function LoginScreen() {
           </div>
         )}
 
-        {/* Stage 2: Enter Email */}
+        {/* Stage 2: Enter Email (handled by Dexie Cloud dialog) */}
         {otpStage === 'enter-email' && (
           <div className="space-y-6">
-            <div>
-              <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">
-                Enter your email
-              </label>
-              <input
-                type="email"
-                value={email}
-                onChange={(e) => { setEmail(e.target.value); setError(''); }}
-                placeholder="you@store.com"
-                className="w-full px-4 py-3 border-2 border-slate-200 rounded-xl focus:border-amber-500 focus:outline-none focus:ring-2 focus:ring-amber-500/20"
-                autoComplete="email"
-                aria-label="Email address"
-                disabled={loggingIn}
-              />
-            </div>
-            {error && <p className="text-red-700 text-xs font-bold bg-red-50 p-2.5 rounded-xl border border-red-200">{error}</p>}
-            <button
-              type="button"
-              onClick={handleCloudLogin}
-              disabled={loggingIn}
-              className="w-full py-4 bg-amber-500 hover:bg-amber-600 text-slate-950 font-extrabold rounded-2xl shadow-lg transition-transform active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {loggingIn ? 'Sending OTP...' : 'Send OTP 📧'}
-            </button>
-          </div>
-        )}
-
-        {/* Stage 3: OTP Verification */}
-        {otpStage === 'verify' && (
-          <div className="space-y-6">
             <div className="text-center">
-              <p className="text-slate-600 text-sm">We're sending an OTP to <strong>{email}</strong></p>
-              <p className="text-xs text-slate-400">Check your inbox and enter the 4-digit code</p>
+              <p className="text-slate-600 text-sm">
+                {mode === 'register'
+                  ? 'Check your email for the OTP code'
+                  : 'Enter the OTP sent to your email'}
+              </p>
+              <p className="text-xs text-slate-400 mt-1">
+                {mode === 'register'
+                  ? 'A verification code has been sent to the email you provided'
+                  : 'We sent a 4-digit code to your email address'}
+              </p>
             </div>
             <div className="flex gap-2 justify-center">
               <input
                 type="text"
                 inputMode="numeric"
                 maxLength={4}
-                value={otp}
-                onChange={(e) => { setOtp(e.target.value.replace(/\D/g, '')); setError(''); }}
+                value=""
                 placeholder="XXXX"
                 className="w-24 h-14 text-center text-2xl font-bold border-2 border-slate-200 rounded-xl focus:border-amber-500 focus:outline-none focus:ring-2 focus:ring-amber-500/20"
                 aria-label="OTP code"
@@ -327,7 +260,7 @@ export function LoginScreen() {
             {error && <p className="text-red-700 text-xs font-bold bg-red-50 p-2.5 rounded-xl border border-red-200 text-center">{error}</p>}
             <button
               type="button"
-              onClick={handleOTPVerify}
+              onClick={handleCloudLogin}
               disabled={loggingIn}
               className="w-full py-4 bg-amber-500 hover:bg-amber-600 text-slate-950 font-extrabold rounded-2xl shadow-lg transition-transform active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
             >
@@ -335,7 +268,7 @@ export function LoginScreen() {
             </button>
             <button
               type="button"
-              onClick={() => { setOtpStage('enter-email'); setOtp(''); setError(''); }}
+              onClick={() => { setOtpStage('none'); setError(''); }}
               className="w-full py-2 text-sm text-slate-500 hover:text-slate-700 font-medium"
             >
               Back to Role Selection
@@ -344,11 +277,11 @@ export function LoginScreen() {
         )}
 
         {/* Stage 4: PIN Setup (Sign Up Only) */}
-        {pinStage !== 'none' && (
+        {mode === 'register' && (
           <form onSubmit={handlePinSubmit} className="space-y-4">
             <div>
               <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">
-                {pinStage === 'setup' ? 'Set 4-Digit PIN (First Time)' : 'Enter 4-Digit PIN'}
+                Set 4-Digit PIN (First Time)
               </label>
               <div className="flex gap-2 justify-center">
                 {[1, 2, 3, 4].map((i) => (
@@ -389,19 +322,12 @@ export function LoginScreen() {
                   />
                 ))}
               </div>
-              {pinStage === 'setup' && (
-                <p className="text-xs text-amber-700 mt-2 text-center">
-                  This PIN will protect cashier access. You can change it anytime in Settings.
-                </p>
-              )}
-              {pinStage === 'verify' && (
-                <p className="text-xs text-slate-500 mt-2 text-center">
-                  Enter your 4-digit PIN to unlock the till.
-                </p>
-              )}
+              <p className="text-xs text-amber-700 mt-2 text-center">
+                This PIN will protect cashier access. You can change it anytime in Settings.
+              </p>
             </div>
 
-            {pinStage === 'setup' && (
+            {mode === 'register' && (
               <div>
                 <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">
                   Confirm 4-Digit PIN
@@ -452,12 +378,12 @@ export function LoginScreen() {
               disabled={loggingIn}
               className="w-full py-4 bg-amber-500 hover:bg-amber-600 text-slate-950 font-extrabold rounded-2xl shadow-lg transition-transform active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {pinStage === 'setup' ? 'Set PIN & Continue' : 'Unlock & Continue'}
+              {loggingIn ? 'Setting PIN...' : 'Set PIN & Continue'}
             </button>
 
             <button
               type="button"
-              onClick={() => { setPinStage('none'); setPin(''); setConfirmPin(''); setError(''); }}
+              onClick={() => { setOtpStage('none'); setPin(''); setConfirmPin(''); setError(''); }}
               className="w-full py-2 text-sm text-slate-500 hover:text-slate-700 font-medium"
             >
               Back to Role Selection

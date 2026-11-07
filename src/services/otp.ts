@@ -1,4 +1,4 @@
-const CLOUD_DB_URL = 'https://zo7vbabeq.dexie.cloud';
+import { db } from '../services/db';
 
 export class OTPLoginError extends Error {
   status?: number;
@@ -9,35 +9,26 @@ export class OTPLoginError extends Error {
   }
 }
 
-async function requestOTPe(email: string, body: object): Promise<void> {
-  const res = await fetch(`${CLOUD_DB_URL}/auth/otp`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ email, ...body }),
-  });
-  if (res.status === 422) {
-    throw new OTPLoginError('Email not registered. Register first or use demo account.', 422);
-  }
-  if (!res.ok) {
-    throw new OTPLoginError('Failed to send OTP. Please try again.', res.status);
-  }
-}
-
+/**
+ * Send OTP request via the built-in Dexie Cloud OTP dialog.
+ * This replaces custom API calls which don't exist on the Dexie Cloud server.
+ *
+ * The built-in dialog shows a mail/OTP interface where the user enters their email
+ * and one-time password. After verification, the user is logged in automatically.
+ *
+ * @param email - The email address to send OTP to
+ * @returns Promise that resolves when login is complete
+ */
 export async function requestOTP(email: string): Promise<void> {
-  await requestOTPe(email, {});
-}
+  if (!email || !/\S+@\S+\.\S+/.test(email)) {
+    throw new OTPLoginError('Please enter a valid email address.');
+  }
 
-export async function registerOTP(email: string): Promise<void> {
-  await requestOTPe(email, { mode: 'register' });
-}
-
-export async function verifyOTP(email: string, otp: string): Promise<void> {
-  const res = await fetch(`${CLOUD_DB_URL}/auth/otp/verify`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ email, otp }),
-  });
-  if (!res.ok) {
-    throw new OTPLoginError('Invalid OTP. Please try again.', res.status);
+  try {
+    // Trigger the built-in Dexie Cloud OTP dialog and wait for completion
+    await db.cloud.login();
+  } catch (err: any) {
+    throw new OTPLoginError(err?.message || 'Failed to send OTP. Please try again.', err?.status || 500);
   }
 }
+
