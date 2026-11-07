@@ -62,10 +62,22 @@ export async function searchProducts(query: string): Promise<Product[]> {
 }
 
 export async function addProduct(data: Omit<Product, 'id' | 'createdAt' | 'updatedAt'>): Promise<string> {
+  const sanitizedData = sanitizeProductData(data);
+  const barcode = sanitizedData.barcode || '';
+
+  // The scan handlers de-dupe before calling this; the manual Add path did not,
+  // so the same barcode could end up filed under two different products.
+  // Throws before the try below on purpose, so the specific message survives.
+  if (barcode) {
+    const existing = await db.products.where('barcode').equals(barcode).first();
+    if (existing) {
+      throw new Error(`Barcode ${barcode} is already used by "${existing.name}".`);
+    }
+  }
+
   try {
     const id = generateId();
     const now = new Date();
-    const sanitizedData = sanitizeProductData(data);
     await db.products.add({
       ...sanitizedData,
       id,

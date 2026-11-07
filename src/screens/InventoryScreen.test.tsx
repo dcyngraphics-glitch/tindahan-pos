@@ -241,17 +241,19 @@ describe('InventoryScreen', () => {
     fireEvent.change(screen.getByPlaceholderText('Search products...'), {
       target: { value: 'ana' },
     });
-    await screen.findByText('Banana');
+    // Debounced: wait for the filter to land, not just for a name that is
+    // already on screen in the unfiltered list.
+    await waitFor(() =>
+      expect(screen.queryByText('Apple', { selector: 'p.font-medium' })).not.toBeInTheDocument()
+    );
     expect(productCard('Banana')).toBeInTheDocument();
-    expect(screen.queryByText('Apple', { selector: 'p.font-medium' })).not.toBeInTheDocument();
     expect(screen.queryByText('Cherry', { selector: 'p.font-medium' })).not.toBeInTheDocument();
 
     // Back to empty query -> all products back.
     fireEvent.change(screen.getByPlaceholderText('Search products...'), {
       target: { value: '' },
     });
-    await screen.findByText('Apple');
-    expect(productCard('Apple')).toBeInTheDocument();
+    await waitFor(() => expect(productCard('Apple')).toBeInTheDocument());
     expect(productCard('Banana')).toBeInTheDocument();
     expect(productCard('Cherry')).toBeInTheDocument();
   });

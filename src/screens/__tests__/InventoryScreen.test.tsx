@@ -209,11 +209,13 @@ describe('InventoryScreen', () => {
       'yak',
     );
 
+    // The query is debounced, so wait for the filter to actually land rather
+    // than asserting while the unfiltered list is still on screen.
     await waitFor(() => {
-      expect(screen.getByText('Yakult Manggadios')).toBeInTheDocument();
+      expect(screen.queryByText('Betamax')).not.toBeInTheDocument();
     });
+    expect(screen.getByText('Yakult Manggadios')).toBeInTheDocument();
     expect(screen.queryByText('Lucky Me Pancit Canton Original')).not.toBeInTheDocument();
-    expect(screen.queryByText('Betamax')).not.toBeInTheDocument();
   });
 
   // ── 5. Sort ─────────────────────────────────────────────────────────

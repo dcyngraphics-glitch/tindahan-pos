@@ -161,7 +161,7 @@ export function TransactionHistoryScreen() {
                             {formatPeso(tx.total)}
                           </span>
                           {tx.voided && (
-                            <span className="bg-red-100 text-red-600 text-[10px] font-black px-2 py-0.5 rounded-md uppercase tracking-wider">
+                            <span className="bg-red-100 text-red-600 text-xs font-black px-2 py-0.5 rounded-md uppercase tracking-wider">
                               Voided
                             </span>
                           )}
@@ -196,7 +196,7 @@ export function TransactionHistoryScreen() {
                   {/* Expanded Breakdown */}
                   {isExpanded && (
                     <div className="border-t border-slate-100 p-4 bg-slate-50/60 rounded-b-2xl space-y-2">
-                      <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+                      <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">
                         Items Purchased
                       </p>
                       <div className="space-y-1.5">
@@ -215,7 +215,7 @@ export function TransactionHistoryScreen() {
                         <span>Tendered: {formatPeso(tx.cashTendered)}</span>
                         <span>Change: {formatPeso(tx.change)}</span>
                       </div>
-                      <p className="text-[10px] text-slate-400 pt-1 font-mono">
+                      <p className="text-xs text-slate-500 pt-1 font-mono">
                         ID: {tx.id}
                       </p>
                     </div>
@@ -228,7 +228,7 @@ export function TransactionHistoryScreen() {
       </div>
 
       {toast && (
-        <div className="fixed bottom-20 left-1/2 -translate-x-1/2 bg-slate-900 text-white px-4 py-2 rounded-xl text-sm font-medium shadow-lg z-50 animate-in fade-in slide-in-from-bottom duration-200">
+        <div className="fixed bottom-20 left-1/2 -translate-x-1/2 bg-slate-900 text-white px-4 py-2 rounded-xl text-sm font-medium shadow-lg z-50">
           {toast}
         </div>
       )}

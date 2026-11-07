@@ -6,6 +6,7 @@ import { useAuth } from '../context/AuthContext';
 import { connectBluetoothScanner } from '../services/bluetoothScanner';
 import { connectSerialScanner } from '../services/serialScanner';
 import { useBluetoothStatus } from '../hooks/useBluetoothStatus';
+import { getCashierPinHash, setCashierPinHash, hashPin } from '../services/cashierPin';
 
 interface DeveloperSettingsModalProps {
   onClose: () => void;
@@ -14,7 +15,7 @@ interface DeveloperSettingsModalProps {
 export function DeveloperSettingsModal({ onClose }: DeveloperSettingsModalProps) {
   const { role } = useAuthStore();
   const { signOut } = useAuth();
-  const { darkMode, setDarkMode, receiptConfig, updateReceiptConfig } = useSettingsStore();
+  const { receiptConfig, updateReceiptConfig } = useSettingsStore();
   const { isPrinterConnected, printerName, isScannerConnected, scannerName, isSerialConnected, setScanner, setSerialScanner, disconnectPrinter, disconnectScanner, disconnectSerialScanner } = useHardwareStore();
   const { connectPrinter } = useBluetoothStatus();
 
@@ -31,15 +32,6 @@ export function DeveloperSettingsModal({ onClose }: DeveloperSettingsModalProps)
   const [newPinInput, setNewPinInput] = useState('');
   const [pinMessage, setPinMessage] = useState<{ text: string; error: boolean } | null>(null);
 
-  const hashPin = async (pin: string): Promise<string> => {
-    const encoder = new TextEncoder();
-    const data = encoder.encode(pin);
-    const buffer = await crypto.subtle.digest('SHA-256', data);
-    return Array.from(new Uint8Array(buffer))
-      .map(b => b.toString(16).padStart(2, '0'))
-      .join('');
-  };
-
   const handleChangePin = async (e: React.FormEvent) => {
     e.preventDefault();
     // Only cashier can change cashier PIN; inventory staff cannot.
@@ -47,7 +39,7 @@ export function DeveloperSettingsModal({ onClose }: DeveloperSettingsModalProps)
       setPinMessage({ text: 'Only Cashier role can change the cashier PIN.', error: true });
       return;
     }
-    const storedHash = localStorage.getItem('tindahan_cashier_pin_hash');
+    const storedHash = getCashierPinHash();
     if (storedHash) {
       const currentHash = await hashPin(currentPinInput);
       if (currentHash !== storedHash) {
@@ -60,7 +52,7 @@ export function DeveloperSettingsModal({ onClose }: DeveloperSettingsModalProps)
       return;
     }
     const newHash = await hashPin(newPinInput);
-    localStorage.setItem('tindahan_cashier_pin_hash', newHash);
+    setCashierPinHash(newHash);
     setCurrentPinInput('');
     setNewPinInput('');
     setPinMessage({ text: 'Cashier PIN updated successfully! ✓', error: false });
@@ -139,20 +131,6 @@ export function DeveloperSettingsModal({ onClose }: DeveloperSettingsModalProps)
           </button>
         </div>
 
-        {/* Theme Preference */}
-        <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200 mb-6 flex justify-between items-center">
-          <div>
-            <p className="font-bold text-slate-800">🌙 Dark Mode Interface</p>
-            <p className="text-xs text-slate-500">Toggle dark theme styling</p>
-          </div>
-          <button
-            onClick={() => setDarkMode(!darkMode)}
-            className={`px-4 py-2 font-bold text-xs rounded-xl transition ${darkMode ? 'bg-amber-500 text-slate-950' : 'bg-slate-200 text-slate-700'}`}
-          >
-            {darkMode ? 'Enabled On' : 'Disabled Off'}
-          </button>
-        </div>
-
         {/* Hardware Status & Pairing */}
         <div className="mb-6 space-y-4">
           <h3 className="text-sm font-extrabold text-slate-800 uppercase tracking-wider">Hardware Peripherals</h3>
@@ -200,7 +178,7 @@ export function DeveloperSettingsModal({ onClose }: DeveloperSettingsModalProps)
         {/* Cashier Security PIN Management */}
         <div className="border-t border-slate-200 pt-6 mb-6">
           <h3 className="text-sm font-extrabold text-slate-800 uppercase tracking-wider mb-2">🔒 Cashier Security PIN</h3>
-          <p className="text-xs text-slate-500 mb-4">Set or update the 4-digit PIN required to log into the Cashier shift.</p>
+          <p className="text-xs text-slate-500 mb-4">Set or update the 4-digit PIN required to unlock the Cashier shift. If no PIN is set, the till opens without one.</p>
 
           <form onSubmit={handleChangePin} className="bg-amber-50/50 p-4 rounded-2xl border border-amber-200 space-y-3">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">

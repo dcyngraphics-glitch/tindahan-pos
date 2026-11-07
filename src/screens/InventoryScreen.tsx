@@ -13,6 +13,8 @@ export function InventoryScreen() {
   const isTablet = useIsAtLeast('tablet');
   const [products, setProducts] = useState<Product[]>([]);
   const [query, setQuery] = useState('');
+  // Debounced so typing does not re-query the table on every keystroke.
+  const [debouncedQuery, setDebouncedQuery] = useState('');
   const [scannerOpen, setScannerOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [scannedBarcode, setScannedBarcode] = useState<string>('');
@@ -24,11 +26,16 @@ export function InventoryScreen() {
   const [categoryFilter, setCategoryFilter] = useState<string>('all');
   const [page, setPage] = useState(1);
 
+  useEffect(() => {
+    const id = setTimeout(() => setDebouncedQuery(query), 200);
+    return () => clearTimeout(id);
+  }, [query]);
+
   const loadProducts = useCallback(async () => {
-    const data = query ? await searchProducts(query) : await getAllProducts();
+    const data = debouncedQuery ? await searchProducts(debouncedQuery) : await getAllProducts();
     setProducts(data);
     setLoading(false);
-  }, [query]);
+  }, [debouncedQuery]);
 
   useEffect(() => {
     loadProducts();
@@ -116,9 +123,11 @@ export function InventoryScreen() {
         <div className="w-96 bg-slate-50 flex flex-col flex-shrink-0 sticky top-0 h-full border-r border-slate-200">
           <header className="p-4 bg-white border-b border-slate-200 flex-shrink-0 flex justify-between items-center">
             <div>
-              <h2 className="text-lg font-bold text-slate-900">
+              {/* A panel label, not a page heading: the screen's h1 is "Inventory"
+                  and must stay the first heading in DOM order. */}
+              <div className="text-lg font-bold text-slate-900">
                 {editingProduct ? '✏️ Edit Product' : '➕ Add New Product'}
-              </h2>
+              </div>
               <p className="text-xs text-slate-500">
                 {editingProduct ? editingProduct.name : 'Fill in details to add item'}
               </p>
@@ -147,81 +156,91 @@ export function InventoryScreen() {
 
       {/* Product List Pane */}
       <div className="flex-1 flex flex-col">
-        <header className="p-4 bg-white border-b border-slate-200">
-          <div className="flex gap-2 items-center mb-2 min-w-0">
-            <h1 className={`font-bold shrink-0 ${isTablet ? 'text-2xl mr-2' : 'text-lg'}`}>Inventory</h1>
+        <header className="p-3 bg-white border-b border-slate-200 space-y-2">
+          {/* Search + primary actions. On a phone this is the only row that
+              matters, so it owns the width and gets 44px targets. */}
+          <div className="flex gap-2 items-center min-w-0">
             <input
               type="text"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder="Search products..."
-              className="flex-1 min-w-0 px-4 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-amber-500"
+              aria-label="Search products"
+              className="flex-1 min-w-0 min-h-[44px] px-4 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-amber-500"
             />
             <button
               onClick={() => setScannerOpen(true)}
               title="Scan barcode with camera"
-              className="shrink-0 p-2 bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-300 rounded-xl text-lg flex items-center justify-center transition"
+              aria-label="Scan barcode with camera"
+              className="shrink-0 p-2 min-w-[44px] min-h-[44px] bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-300 rounded-xl text-lg flex items-center justify-center transition"
             >
               📷
             </button>
             <button
               onClick={() => { setScannedBarcode('manual-' + Date.now()); setEditingProduct(null); }}
-              className="shrink-0 px-3 py-2 bg-slate-900 text-white rounded-xl font-medium text-sm whitespace-nowrap"
+              className="shrink-0 px-3 py-2 min-h-[44px] bg-slate-900 text-white rounded-xl font-medium text-sm whitespace-nowrap"
             >
               + Add
             </button>
           </div>
-          <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-slate-600">
-            <span>Showing {pageProducts.length} of {sortedProducts.length} products · page {page}</span>
-            <div className="flex flex-wrap items-center gap-2">
-              {categories.length > 0 && (
-                <div className="flex items-center gap-1">
-                  <span>Category:</span>
-                  <select
-                    value={categoryFilter}
-                    onChange={(e) => { setCategoryFilter(e.target.value); setPage(1); }}
-                    className="max-w-full px-2 py-1 border border-slate-200 rounded-lg bg-white font-medium text-slate-800"
-                  >
-                    <option value="all">All Categories ({products.length})</option>
-                    {categories.map(c => (
-                      <option key={c} value={c}>{c}</option>
-                    ))}
-                  </select>
-                </div>
-              )}
+
+          {/* Title, result count and pagination share one row — the header used
+              to stack four rows and eat 191px of a phone screen. */}
+          <div className="flex items-center justify-between gap-2 flex-wrap">
+            <h1 className={`font-bold shrink-0 ${isTablet ? 'text-2xl' : 'text-lg'}`}>Inventory</h1>
+            <span className="text-xs text-slate-500">
+              Showing {pageProducts.length} of {sortedProducts.length} products
+            </span>
+            <div className="flex items-center gap-1">
+              <button
+                onClick={() => setPage(p => Math.max(1, p - 1))}
+                disabled={page === 1}
+                className="px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium rounded-lg min-w-[44px] min-h-[44px] disabled:opacity-50 transition"
+              >
+                Prev
+              </button>
+              <span className="px-2 py-2 text-sm text-slate-600">Page {page} of {Math.ceil(sortedProducts.length / PAGE_SIZE)}</span>
+              <button
+                onClick={() => setPage(p => Math.min(Math.ceil(sortedProducts.length / PAGE_SIZE), p + 1))}
+                disabled={page === Math.ceil(sortedProducts.length / PAGE_SIZE)}
+                className="px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium rounded-lg min-w-[44px] min-h-[44px] disabled:opacity-50 transition"
+              >
+                Next
+              </button>
+            </div>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2 text-xs text-slate-600">
+            {categories.length > 0 && (
               <div className="flex items-center gap-1">
-                <span>Sort by:</span>
+                <span>Category:</span>
                 <select
-                  value={sortBy}
-                  onChange={(e) => setSortBy(e.target.value as any)}
-                  className="max-w-full px-2 py-1 border border-slate-200 rounded-lg bg-white font-medium text-slate-800"
+                  value={categoryFilter}
+                  onChange={(e) => { setCategoryFilter(e.target.value); setPage(1); }}
+                  className="max-w-full px-2 py-1 min-h-[44px] border border-slate-200 rounded-xl bg-white font-medium text-slate-800"
                 >
-                  <option value="name-asc">Alphabetical (A-Z)</option>
-                  <option value="name-desc">Alphabetical (Z-A)</option>
-                  <option value="price-asc">Price (Low → High)</option>
-                  <option value="price-desc">Price (High → Low)</option>
-                  <option value="stock-asc">Stock (Low → High)</option>
-                  <option value="stock-desc">Stock (High → Low)</option>
+                  <option value="all">All Categories ({products.length})</option>
+                  {categories.map(c => (
+                    <option key={c} value={c}>{c}</option>
+                  ))}
                 </select>
               </div>
+            )}
+            <div className="flex items-center gap-1">
+              <span>Sort by:</span>
+              <select
+                value={sortBy}
+                onChange={(e) => setSortBy(e.target.value as any)}
+                className="max-w-full px-2 py-1 min-h-[44px] border border-slate-200 rounded-xl bg-white font-medium text-slate-800"
+              >
+                <option value="name-asc">Alphabetical (A-Z)</option>
+                <option value="name-desc">Alphabetical (Z-A)</option>
+                <option value="price-asc">Price (Low → High)</option>
+                <option value="price-desc">Price (High → Low)</option>
+                <option value="stock-asc">Stock (Low → High)</option>
+                <option value="stock-desc">Stock (High → Low)</option>
+              </select>
             </div>
-          </div>{/* closes flex flex-wrap */}
-          <div className="flex items-center justify-center pt-2">
-            <button
-              onClick={() => setPage(p => Math.max(1, p - 1))}
-              disabled={page === 1}
-              className="px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium rounded-lg min-w-[44px] min-h-[44px] disabled:opacity-50 transition"
-            >
-              Prev
-            </button>
-            <span className="px-2 py-2 text-sm text-slate-600">Page {page} of {Math.ceil(sortedProducts.length / PAGE_SIZE)}</span>
-            <button
-              onClick={() => setPage(p => Math.min(Math.ceil(sortedProducts.length / PAGE_SIZE), p + 1))}
-              disabled={page === Math.ceil(sortedProducts.length / PAGE_SIZE)}
-              className="px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium rounded-lg min-w-[44px] min-h-[44px] disabled:opacity-50 transition"
-            >
-              Next
-            </button>
           </div>
         </header>
 
@@ -234,7 +253,7 @@ export function InventoryScreen() {
               <p className="mb-4">No products yet</p>
               <button
                 onClick={() => { setScannedBarcode('manual-' + Date.now()); setEditingProduct(null); }}
-                className="px-6 py-2 bg-slate-900 text-white rounded-xl"
+                className="px-6 py-2 min-h-[44px] bg-slate-900 text-white rounded-xl"
               >
                 Add First Product
               </button>
@@ -290,21 +309,44 @@ export function InventoryScreen() {
                   onClick={() => setEditingProduct(product)}
                 >
                   <div className="flex-1 min-w-0">
-                    <p className="font-medium truncate">{product.name}</p>
-                    <p className="text-sm text-slate-600">{formatPeso(product.price)} · Stock: {product.stock}</p>
+                    <div className="flex items-center gap-2">
+                      <p className="font-medium truncate">{product.name}</p>
+                      {/* The tablet list colours stock red at <=5; the phone card
+                          used to show the same number in plain grey. */}
+                      {product.stock <= 0 && (
+                        <span className="bg-red-600 text-white text-xs font-extrabold px-1.5 py-0.5 rounded-md uppercase tracking-wider shrink-0">Out</span>
+                      )}
+                      {product.stock > 0 && product.stock <= 5 && (
+                        <span className="bg-red-100 text-red-700 text-xs font-extrabold px-1.5 py-0.5 rounded-md uppercase tracking-wider shrink-0">Low</span>
+                      )}
+                    </div>
+                    <p className={`text-sm ${product.stock <= 5 ? 'text-red-700 font-bold' : 'text-slate-600'}`}>
+                      {formatPeso(product.price)} · Stock: {product.stock}
+                    </p>
                     <p className="text-xs text-slate-500 font-mono truncate">{product.barcode}</p>
                     {product.category && (
                       <p className="text-xs text-slate-400 mt-0.5">#{product.category}</p>
                     )}
                   </div>
-                  <button
-                    onClick={(e) => { e.stopPropagation(); setDeleteConfirmId(product.id); setDeleteConfirmName(product.name); }}
-                    className="text-red-700 p-3 min-w-[44px] min-h-[44px] inline-flex items-center justify-center font-bold text-base shrink-0"
-                    title="Delete product"
-                    aria-label="Delete product"
-                  >
-                    ✕
-                  </button>
+                  <div className="flex items-center gap-1 shrink-0">
+                    {/* The card was tappable but nothing said so; the tablet row
+                        only signalled it with a hover style, which never fires
+                        on a phone. */}
+                    <button
+                      onClick={(e) => { e.stopPropagation(); setEditingProduct(product); }}
+                      className="px-3 py-2 min-h-[44px] text-amber-700 bg-amber-50 hover:bg-amber-100 font-bold rounded-lg text-xs transition"
+                    >
+                      Edit
+                    </button>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); setDeleteConfirmId(product.id); setDeleteConfirmName(product.name); }}
+                      className="text-red-700 p-3 min-w-[44px] min-h-[44px] inline-flex items-center justify-center font-bold text-base"
+                      title="Delete product"
+                      aria-label="Delete product"
+                    >
+                      ✕
+                    </button>
+                  </div>
                 </div>
               ))}
             </div>
@@ -316,7 +358,7 @@ export function InventoryScreen() {
     {/* Delete Confirmation Modal */}
     {deleteConfirmId && (
       <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-        <div className="bg-white rounded-2xl max-w-sm w-full p-6 shadow-xl animate-in fade-in zoom-in-95">
+        <div className="bg-white rounded-3xl max-w-sm w-full p-6 shadow-xl">
           <h3 className="text-lg font-bold text-slate-900 mb-2">Delete Product?</h3>
           <p className="text-sm text-slate-600 mb-6">
             Are you sure you want to delete <strong>{deleteConfirmName}</strong>? This action cannot be undone.

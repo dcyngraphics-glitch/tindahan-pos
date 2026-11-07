@@ -38,7 +38,7 @@ export function LoginScreen() {
 
   return (
     <div ref={containerRef} className="min-h-dvh bg-gradient-to-br from-amber-500 via-amber-600 to-slate-900 flex items-center justify-center p-4">
-      <div ref={cardRef} className={`bg-white rounded-3xl shadow-2xl w-full border border-amber-100 ${role === 'cashier' ? 'max-w-lg p-8 sm:p-10' : 'max-w-md p-8'}`}>
+      <div ref={cardRef} className="bg-white rounded-3xl shadow-2xl w-full max-w-md p-8 sm:p-10 border border-amber-100">
         <div className="text-center mb-8">
           <div className="w-16 h-16 bg-amber-100 text-amber-600 rounded-2xl mx-auto flex items-center justify-center text-3xl font-extrabold shadow-inner mb-4">
             🏪

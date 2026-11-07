@@ -1,5 +1,26 @@
 @import "tailwindcss";
 
+/*
+ * Design scale — the app's consistent ramps. Pick from these rather than
+ * introducing a new step; the previous lack of a documented scale is why the UI
+ * drifted to seven corner radii and nineteen unrelated z-50 layers.
+ *
+ * Corner radius
+ *   inputs, buttons, selects, small badges -> rounded-xl   (12px)
+ *   cards, list rows, panels                -> rounded-2xl  (16px)
+ *   modals, sheets, dialog cards            -> rounded-3xl  (24px)
+ *   pills, dots, avatars                    -> rounded-full
+ *
+ * Layer order (z-index)
+ *   30  sticky header bar
+ *   40  nav drawer backdrop
+ *   50  nav drawer, modals, toasts        (mutually exclusive in practice)
+ *   60  cloud sign-in prompt / receipt preview — above every modal
+ *
+ * Type floor: nothing below 12px (text-xs). Hierarchy comes from weight and
+ * colour, never from shrinking text.
+ */
+
 :root {
   --primary: #0f172a;
   --primary-foreground: #f8fafc;
@@ -21,7 +42,6 @@ body {
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   background: #f8fafc;
   color: #0f172a;
-  -webkit-tap-highlight-color: transparent;
 }
 
 #root {

@@ -42,6 +42,26 @@ export function CashierScreen() {
       .catch(err => console.error('Failed to load products:', err));
   }, []);
 
+  /**
+   * Discounts are clamped so a sale can never reach ₱0.00 by typing 100% (or a
+   * fixed amount at or above the subtotal) — that used to complete silently.
+   */
+  const applyDiscountInput = (raw: string) => {
+    setDiscountValue(raw);
+    const v = parseFloat(raw);
+    if (isNaN(v) || v <= 0) {
+      setDiscount(null);
+      return;
+    }
+    if (discountType === 'percent') {
+      setDiscount({ type: 'percent', value: Math.min(99, v) });
+      return;
+    }
+    const subtotal = getTotal();
+    const capped = subtotal > 0 ? Math.min(Math.round(v * 100), subtotal - 1) : 0;
+    setDiscount(capped > 0 ? { type: 'fixed', value: capped } : null);
+  };
+
   const closeCheckout = useCallback(() => {
     setCheckoutOpen(false);
     setDiscount(null);
@@ -128,6 +148,12 @@ export function CashierScreen() {
     const cashCents = Math.round(cash * 100);
     if (isNaN(cash) || cashCents < total) {
       showToast('Insufficient cash');
+      return;
+    }
+    // A zero-total sale is never a real sale; block it rather than silently
+    // recording one.
+    if (total <= 0) {
+      showToast('The sale total is zero. Add items before checkout.');
       return;
     }
 
@@ -251,9 +277,9 @@ export function CashierScreen() {
               <div>
                 <h1 className="text-xl font-bold">Cashier</h1>
                 <div className="flex items-center gap-3 text-xs mt-0.5">
-                  <span className={`inline-flex items-center gap-1 font-medium ${scannerConnected ? 'text-green-600' : 'text-red-600'}`}>
-                    <span className={`w-2 h-2 rounded-full ${scannerConnected ? 'bg-green-500 animate-pulse' : 'bg-red-500'}`} />
-                    📷 USB Scanner {scannerConnected ? `(Scans: ${scannerActivity})` : 'Disconnected'}
+                  <span className={`inline-flex items-center gap-1 font-medium ${scannerConnected ? 'text-green-600' : 'text-slate-500'}`}>
+                    <span className={`w-2 h-2 rounded-full ${scannerConnected ? 'bg-green-500' : 'bg-slate-300'}`} />
+                    📷 Scanner {scannerConnected ? `Active · ${scannerActivity} scans` : 'Idle · no scans yet'}
                   </span>
                   <button
                     onClick={() => connectPrinter()}
@@ -349,7 +375,7 @@ export function CashierScreen() {
                 <button
                   onClick={() => setCheckoutOpen(true)}
                   disabled={items.length === 0}
-                  className="px-8 py-3 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-slate-900 font-extrabold text-lg shadow-md disabled:opacity-40 transition"
+                  className="px-8 py-3 rounded-xl bg-amber-500 hover:bg-amber-600 text-slate-950 font-extrabold text-lg shadow-md disabled:opacity-40 transition"
                 >
                   Checkout 💳
                 </button>
@@ -385,7 +411,7 @@ export function CashierScreen() {
             <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl space-y-6">
               <div className="flex justify-between items-center border-b pb-4">
                 <h3 className="text-xl font-bold text-slate-900">Process Checkout</h3>
-                <button onClick={closeCheckout} aria-label="Close modal" className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center font-bold">✕</button>
+                <button onClick={closeCheckout} aria-label="Close checkout" className="w-11 h-11 rounded-full bg-slate-100 flex items-center justify-center font-bold">✕</button>
               </div>
 
               <div>
@@ -412,11 +438,7 @@ export function CashierScreen() {
                     type="number"
                     min="0"
                     value={discountValue}
-                    onChange={e => {
-                      setDiscountValue(e.target.value);
-                      const v = parseFloat(e.target.value);
-                      setDiscount(isNaN(v) || v <= 0 ? null : { type: discountType, value: discountType === 'percent' ? v : Math.round(Number(v) * 100) });
-                    }}
+                    onChange={e => applyDiscountInput(e.target.value)}
                     placeholder={discountType === 'percent' ? '0%' : '0.00'}
                     className="flex-1 min-h-[44px] px-4 py-2 rounded-xl border-2 border-slate-200 font-bold focus:outline-none focus:border-amber-500"
                   />
@@ -479,7 +501,7 @@ export function CashierScreen() {
                 disabled={!cashTendered || Math.round(parseFloat(cashTendered) * 100) < total}
                 className="w-full py-4 bg-amber-500 hover:bg-amber-600 text-slate-900 font-extrabold text-lg rounded-2xl shadow-lg disabled:opacity-40 transition"
               >
-                Complete Payment & Print Receipt ✓
+                Complete Payment
               </button>
             </div>
           </div>
@@ -532,8 +554,14 @@ export function CashierScreen() {
                 >
                   🖨️ Windows / System Print (All Printers)
                 </button>
-                <button onClick={closeReceipt} className="w-full py-3 bg-amber-500 text-white font-semibold rounded-xl">
+                <button onClick={closeReceipt} className="w-full py-3 bg-amber-500 hover:bg-amber-600 text-slate-900 font-extrabold rounded-xl transition">
                   Next Customer →
+                </button>
+                <button
+                  onClick={handleVoidCurrentReceipt}
+                  className="w-full py-3 bg-red-50 hover:bg-red-100 text-red-600 font-bold rounded-xl border border-red-200 text-sm transition"
+                >
+                  ⚠️ Void Transaction
                 </button>
               </div>
             </div>
@@ -578,9 +606,9 @@ export function CashierScreen() {
           <div>
             <h1 className="text-xl font-bold">Cashier</h1>
             <div className="flex items-center gap-3 text-xs mt-0.5">
-              <span className={`inline-flex items-center gap-1 font-medium ${scannerConnected ? 'text-green-600' : 'text-red-600'}`}>
-                <span className={`w-2 h-2 rounded-full ${scannerConnected ? 'bg-green-500 animate-pulse' : 'bg-red-500'}`} />
-                📷 USB Scanner {scannerConnected ? `(${scannerActivity})` : 'Disconnected'}
+              <span className={`inline-flex items-center gap-1 font-medium ${scannerConnected ? 'text-green-600' : 'text-slate-500'}`}>
+                <span className={`w-2 h-2 rounded-full ${scannerConnected ? 'bg-green-500' : 'bg-slate-300'}`} />
+                📷 Scanner {scannerConnected ? `Active · ${scannerActivity} scans` : 'Idle · no scans yet'}
               </span>
               <button
                 onClick={() => connectPrinter()}
@@ -629,14 +657,16 @@ export function CashierScreen() {
               <div className="flex items-center gap-2">
                 <button
                   onClick={() => updateQuantity(item.cartId, item.quantity - 1)}
-                  className="w-8 h-8 bg-slate-100 rounded-lg text-lg font-bold"
+                  aria-label={`Decrease ${item.name} quantity`}
+                  className="w-11 h-11 bg-slate-100 rounded-lg text-lg font-bold"
                 >
                   −
                 </button>
                 <span className="w-8 text-center font-bold">{item.quantity}</span>
                 <button
                   onClick={() => updateQuantity(item.cartId, item.quantity + 1)}
-                  className="w-8 h-8 bg-slate-100 rounded-lg text-lg font-bold"
+                  aria-label={`Increase ${item.name} quantity`}
+                  className="w-11 h-11 bg-slate-100 rounded-lg text-lg font-bold"
                 >
                   +
                 </button>
@@ -670,14 +700,14 @@ export function CashierScreen() {
           <button
             onClick={clearCart}
             disabled={items.length === 0}
-            className="px-3 py-2.5 rounded-xl border border-slate-300 font-bold text-xs text-slate-700 disabled:opacity-40"
+            className="px-3 py-2.5 rounded-xl border border-slate-300 font-bold text-xs text-slate-700 disabled:opacity-40 min-h-[44px]"
           >
             Clear
           </button>
           <button
             onClick={() => setCheckoutOpen(true)}
             disabled={items.length === 0}
-            className="px-6 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-slate-900 font-extrabold text-sm shadow-md disabled:opacity-40 transition"
+            className="px-6 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-slate-900 font-extrabold text-sm shadow-md disabled:opacity-40 transition min-h-[44px]"
           >
             Checkout 💳
           </button>
@@ -690,7 +720,7 @@ export function CashierScreen() {
           <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl space-y-6">
             <div className="flex justify-between items-center border-b pb-4">
               <h3 className="text-xl font-bold text-slate-900">Process Checkout</h3>
-              <button onClick={closeCheckout} className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center font-bold">✕</button>
+              <button onClick={closeCheckout} aria-label="Close checkout" className="w-11 h-11 rounded-full bg-slate-100 flex items-center justify-center font-bold">✕</button>
             </div>
 
             <div>
@@ -717,11 +747,7 @@ export function CashierScreen() {
                   type="number"
                   min="0"
                   value={discountValue}
-                  onChange={e => {
-                    setDiscountValue(e.target.value);
-                    const v = parseFloat(e.target.value);
-                    setDiscount(isNaN(v) || v <= 0 ? null : { type: discountType, value: discountType === 'percent' ? v : Math.round(Number(v) * 100) });
-                  }}
+                  onChange={e => applyDiscountInput(e.target.value)}
                   placeholder={discountType === 'percent' ? '0%' : '0.00'}
                   className="flex-1 min-h-[44px] px-4 py-2 rounded-xl border-2 border-slate-200 font-bold focus:outline-none focus:border-amber-500"
                 />
@@ -759,9 +785,9 @@ export function CashierScreen() {
               onClick={handleCheckout}
               disabled={!cashTendered || Math.round(parseFloat(cashTendered) * 100) < total}
               className="w-full py-4 bg-amber-500 hover:bg-amber-600 text-slate-900 font-extrabold text-lg rounded-2xl shadow-lg disabled:opacity-40 transition"
-            >
-              Complete Payment & Print Receipt ✓
-            </button>
+              >
+              Complete Payment
+              </button>
           </div>
         </div>
       )}
@@ -814,28 +840,13 @@ export function CashierScreen() {
                 🖨️ Windows / System Print (All Printers)
               </button>
               <button onClick={closeReceipt} className="w-full py-3 bg-amber-500 hover:bg-amber-600 text-slate-900 font-extrabold rounded-xl transition">
-                Close
-              </button>
-              <button
-                onClick={() => { setVoidConfirmOpen(true); }}
-                className="w-full py-3 bg-red-50 hover:bg-red-100 text-red-600 font-bold rounded-xl border border-red-200 text-sm transition"
-              >
-                ⚠️ Void Transaction
-              </button>
-              <button onClick={closeReceipt} className="w-full py-3 bg-amber-500 hover:bg-amber-600 text-slate-900 font-extrabold rounded-xl transition">
-                Close
-              </button>
-              <button
-                onClick={() => { setVoidConfirmOpen(true); }}
-                className="w-full py-3 bg-red-50 hover:bg-red-100 text-red-600 font-bold rounded-xl border border-red-200 text-sm transition"
-              >
-                ⚠️ Void Transaction
+                Next Customer →
               </button>
               <button
                 onClick={handleVoidCurrentReceipt}
-                className="w-full py-2.5 bg-red-50 hover:bg-red-100 text-red-600 font-bold rounded-xl border border-red-200 text-sm transition"
+                className="w-full py-3 bg-red-50 hover:bg-red-100 text-red-600 font-bold rounded-xl border border-red-200 text-sm transition"
               >
-                ⚠️ Void / Cancel This Transaction
+                ⚠️ Void Transaction
               </button>
             </div>
           </div>
@@ -904,7 +915,7 @@ export function CashierScreen() {
       )}
       {/* Toast notification */}
       {toast && (
-        <div className="fixed bottom-20 left-1/2 -translate-x-1/2 z-50 bg-slate-900 text-white px-6 py-3 rounded-2xl shadow-xl text-sm font-semibold animate-fade-in">
+        <div className="fixed bottom-20 left-1/2 -translate-x-1/2 z-50 bg-slate-900 text-white px-6 py-3 rounded-2xl shadow-xl text-sm font-semibold">
           {toast}
         </div>
       )}

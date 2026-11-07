@@ -49,7 +49,7 @@ export function BarcodeScanner({ onScan }: BarcodeScannerProps) {
       <div className="flex-1 flex items-center justify-center relative">
         <div id="scanner" className="scanner-container w-full h-full" />
         <div className="absolute inset-0 border-4 border-amber-500 rounded-2xl m-4 pointer-events-none flex items-center justify-center">
-          <span className="bg-black/80 text-amber-400 text-[10px] font-bold px-3 py-1 rounded-full uppercase tracking-wider shadow-sm">
+          <span className="bg-black/80 text-amber-400 text-xs font-bold px-3 py-1 rounded-full uppercase tracking-wider shadow-sm">
             Align Barcode in Frame
           </span>
         </div>

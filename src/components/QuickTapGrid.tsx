@@ -54,7 +54,7 @@ export function QuickTapGrid({ products, onProductsUpdated }: QuickTapGridProps)
               className="relative w-full flex flex-col items-center justify-between p-3 bg-white border-2 border-slate-200 hover:border-amber-400 rounded-2xl transition-all active:scale-95 shadow-sm hover:shadow-md disabled:opacity-40 disabled:cursor-not-allowed h-28 text-center"
             >
               {product.stock <= 0 && (
-                <span className="absolute top-1 left-1 bg-red-600 text-white text-[9px] font-extrabold px-1.5 py-0.5 rounded-md uppercase tracking-wider shadow-sm z-10">
+                <span className="absolute top-1 left-1 bg-red-600 text-white text-xs font-extrabold px-1.5 py-0.5 rounded-md uppercase tracking-wider shadow-sm z-10">
                   Out
                 </span>
               )}
@@ -65,17 +65,21 @@ export function QuickTapGrid({ products, onProductsUpdated }: QuickTapGridProps)
                 <span className="text-sm font-black text-amber-600 block">
                   ₱{(product.price / 100).toFixed(2)}
                 </span>
-                <span className={`text-[10px] font-bold ${product.stock <= 0 ? 'text-red-600 font-black' : product.stock <= 5 ? 'text-red-700' : 'text-slate-400'}`}>
+                <span className={`text-xs font-bold ${product.stock <= 0 ? 'text-red-600 font-black' : product.stock <= 5 ? 'text-red-700' : 'text-slate-500'}`}>
                   Stock: {product.stock}
                 </span>
               </div>
             </button>
+            {/* 44x44 hit area; always visible on touch, hover-revealed on desktop.
+                It was opacity-0 + group-hover only, so a touchscreen could never
+                reach it and the only way to unpin was the picker modal. */}
             <button
               onClick={(e) => { e.stopPropagation(); toggleQuickTap(product); }}
-              className="absolute -top-1.5 -right-1.5 w-6 h-6 bg-red-500 hover:bg-red-600 text-white rounded-full text-xs font-bold flex items-center justify-center shadow opacity-0 group-hover:opacity-100 transition"
+              aria-label={`Remove ${product.name} from QuickTap`}
               title="Remove from QuickTap"
+              className="absolute -top-2 -right-2 w-11 h-11 flex items-center justify-center rounded-full text-red-600 hover:bg-red-50 transition md:opacity-0 md:group-hover:opacity-100"
             >
-              ✕
+              <span className="text-xs font-bold leading-none">✕</span>
             </button>
           </div>
         ))}
@@ -102,7 +106,8 @@ export function QuickTapGrid({ products, onProductsUpdated }: QuickTapGridProps)
               </div>
               <button
                 onClick={() => setPickerOpen(false)}
-                className="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-600 font-bold"
+                aria-label="Close QuickTap manager"
+                className="w-11 h-11 rounded-full bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-600 font-bold"
               >
                 ✕
               </button>
@@ -137,12 +142,12 @@ export function QuickTapGrid({ products, onProductsUpdated }: QuickTapGridProps)
                       <div className="flex items-center gap-2">
                         <p className="font-bold text-slate-800 text-sm">{product.name}</p>
                         {isUnder30 && (
-                          <span className="bg-green-100 text-green-800 text-[10px] font-extrabold px-2 py-0.5 rounded-full">
+                          <span className="bg-green-100 text-green-800 text-xs font-extrabold px-2 py-0.5 rounded-full">
                             Recommended (≤ ₱30)
                           </span>
                         )}
                       </div>
-                      <p className="text-xs text-slate-400">₱{(product.price / 100).toFixed(2)} • Stock: {product.stock}</p>
+                      <p className="text-xs text-slate-500">₱{(product.price / 100).toFixed(2)} • Stock: {product.stock}</p>
                     </div>
                     <button
                       onClick={() => toggleQuickTap(product)}

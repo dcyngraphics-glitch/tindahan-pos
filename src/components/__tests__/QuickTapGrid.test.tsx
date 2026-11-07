@@ -17,7 +17,9 @@ describe('QuickTapGrid', () => {
   it('renders QuickTap items and adds in-stock products to the cart on tap', () => {
     const products = [product('a', { isQuickTap: true, stock: 5 }), product('b', { isQuickTap: true, stock: 5 })];
     render(<QuickTapGrid products={products} />);
-    const btn = screen.getByRole('button', { name: /Product a/i });
+    // The tile carries title={product.name}; each tile also has a
+    // "Remove Product a from QuickTap" button, so query by title to disambiguate.
+    const btn = screen.getByTitle('Product a');
     btn.click();
     expect(useCartStore.getState().items).toHaveLength(1);
     expect(useCartStore.getState().items[0].name).toBe('Product a');
@@ -26,7 +28,7 @@ describe('QuickTapGrid', () => {
   it('does not add an out-of-stock product to the cart', () => {
     const products = [product('a', { isQuickTap: true, stock: 0 })];
     render(<QuickTapGrid products={products} />);
-    const btn = screen.getByRole('button', { name: /Product a/i });
+    const btn = screen.getByTitle('Product a');
     expect(btn).toBeDisabled();
     btn.click();
     expect(useCartStore.getState().items).toHaveLength(0);

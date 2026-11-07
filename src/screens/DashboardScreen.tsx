@@ -11,7 +11,19 @@ export function DashboardScreen() {
   const [refreshKey, setRefreshKey] = useState(0);
   const [dateRange, setDateRange] = useState<'today' | '7d' | '30d' | 'all'>('all');
   const [topSortBy, setTopSortBy] = useState<'qty' | 'rev'>('qty');
-  const [now] = useState(() => new Date());
+  // 'Today' is a moving target: captured once at mount, the dashboard kept
+  // showing yesterday's range if the app was left open overnight.
+  const [now, setNow] = useState(() => new Date());
+
+  useEffect(() => {
+    const id = setInterval(() => setNow(new Date()), 60_000);
+    const onFocus = () => setNow(new Date());
+    window.addEventListener('focus', onFocus);
+    return () => {
+      clearInterval(id);
+      window.removeEventListener('focus', onFocus);
+    };
+  }, []);
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -211,26 +223,26 @@ export function DashboardScreen() {
           <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs">
             <p className="text-xs font-medium text-slate-500 uppercase tracking-wider">Total Revenue</p>
             <p className="text-3xl font-extrabold text-emerald-600 mt-1">{formatPeso(totalRevenue)}</p>
-            <p className="text-[11px] text-slate-400 mt-1">{totalTransactionsCount} completed sales</p>
+            <p className="text-xs text-slate-500 mt-1">{totalTransactionsCount} completed sales</p>
           </div>
           <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs">
             <p className="text-xs font-medium text-slate-500 uppercase tracking-wider">Gross Profit</p>
             <p className="text-3xl font-extrabold text-amber-600 mt-1">{formatPeso(totalProfit)}</p>
-            <p className="text-[11px] text-amber-700 font-bold mt-1">
+            <p className="text-xs text-amber-700 font-bold mt-1">
               {profitMarginPercent}% margin
             </p>
           </div>
           <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs">
             <p className="text-xs font-medium text-slate-500 uppercase tracking-wider">Average Basket</p>
             <p className="text-3xl font-extrabold text-slate-900 mt-1">{formatPeso(averageTransaction)}</p>
-            <p className="text-[11px] text-slate-400 mt-1">Per transaction average</p>
+            <p className="text-xs text-slate-500 mt-1">Per transaction average</p>
           </div>
           <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs">
             <p className="text-xs font-medium text-slate-500 uppercase tracking-wider">Low Stock Alerts</p>
             <p className={`text-3xl font-extrabold mt-1 ${lowStockProducts.length > 0 ? 'text-red-700' : 'text-slate-900'}`}>
               {lowStockProducts.length}
             </p>
-            <p className="text-[11px] text-slate-400 mt-1">Products with ≤ 5 units</p>
+            <p className="text-xs text-slate-500 mt-1">Products with ≤ 5 units</p>
           </div>
         </div>
 

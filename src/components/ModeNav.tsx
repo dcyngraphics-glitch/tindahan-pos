@@ -3,6 +3,7 @@ import { useAppStore, type AppMode } from '../stores/appStore';
 import { useAuthStore } from '../stores/authStore';
 import { useAuth } from '../context/AuthContext';
 import { DeveloperSettingsModal } from './DeveloperSettingsModal';
+import { ConfirmDialog } from './ConfirmDialog';
 
 interface ModeNavProps {
   isOpen: boolean;
@@ -40,14 +41,14 @@ export function ModeNav({ isOpen, onClose, lowStockCount = 0 }: ModeNavProps) {
     <>
       {/* Backdrop overlay */}
       <div
-        className="fixed inset-0 bg-black/50 z-40 transition-opacity animate-in fade-in duration-200"
+        className="fixed inset-0 bg-black/50 z-40 transition-opacity"
         onClick={onClose}
         aria-hidden="true"
       />
 
       {/* Sliding Navigation Drawer */}
       <nav
-        className="fixed bottom-0 left-0 top-0 h-full bg-white border-r border-slate-200 flex flex-col py-4 px-3 z-50 shadow-2xl w-64 max-w-[85vw] animate-in slide-in-from-left duration-200"
+        className="fixed bottom-0 left-0 top-0 h-full bg-white border-r border-slate-200 flex flex-col py-4 px-3 z-50 shadow-2xl w-64 max-w-[85vw]"
         role="navigation"
         aria-label="Main Navigation"
       >
@@ -84,7 +85,7 @@ export function ModeNav({ isOpen, onClose, lowStockCount = 0 }: ModeNavProps) {
                 <span className="text-sm">{m.label}</span>
               </div>
               {m.id === 'inventory' && lowStockCount > 0 && (
-                <span className="bg-red-500 text-white text-[10px] font-black px-2 py-0.5 rounded-full shadow-xs">
+                <span className="bg-red-500 text-white text-xs font-black px-2 py-0.5 rounded-full shadow-xs">
                   {lowStockCount}
                 </span>
               )}
@@ -115,31 +116,17 @@ export function ModeNav({ isOpen, onClose, lowStockCount = 0 }: ModeNavProps) {
         </div>
       </nav>
 
-      {logoutConfirmOpen && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-label="Log out">
-          <div className="bg-white rounded-2xl max-w-sm w-full p-6 shadow-xl animate-in fade-in zoom-in-95">
-            <h3 className="text-lg font-bold text-slate-900 mb-2">Log Out?</h3>
-            <p className="text-sm text-slate-600 mb-6">You will be signed out of your account. This cannot be undone.</p>
-            <div className="flex gap-3">
-              <button
-                onClick={() => setLogoutConfirmOpen(false)}
-                className="flex-1 py-3 px-4 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold rounded-xl min-h-[44px] transition"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={() => {
-                  setLogoutConfirmOpen(false);
-                  void signOut();
-                }}
-                className="flex-1 py-3 px-4 bg-red-600 hover:bg-red-700 text-white font-semibold rounded-xl min-h-[44px] transition"
-              >
-                Log Out
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <ConfirmDialog
+        open={logoutConfirmOpen}
+        title="Log Out?"
+        message="You will be signed out of your account on this device."
+        confirmLabel="Log Out"
+        onConfirm={() => {
+          setLogoutConfirmOpen(false);
+          void signOut();
+        }}
+        onCancel={() => setLogoutConfirmOpen(false)}
+      />
 
       {devSettingsOpen && <DeveloperSettingsModal onClose={() => setDevSettingsOpen(false)} />}
     </>

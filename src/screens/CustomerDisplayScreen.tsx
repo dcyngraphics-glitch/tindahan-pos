@@ -13,6 +13,13 @@ function getStoreName(): string {
   return 'Tindahan ni Aling Puring';
 }
 
+/**
+ * The customer-facing screen.
+ *
+ * The idle state is dark text on the amber gradient on purpose: white on
+ * amber-500..700 measured 2.15:1 at the light end, which fails WCAG AA for the
+ * one surface the customer actually reads from across the counter.
+ */
 export function CustomerDisplay() {
   const { items, getTotal } = useCartStore();
   const [, setTick] = useState(0);
@@ -35,10 +42,10 @@ export function CustomerDisplay() {
 
   if (items.length === 0) {
     return (
-      <div className="min-h-dvh bg-gradient-to-br from-amber-500 to-amber-700 flex flex-col items-center justify-center text-white">
+      <div className="min-h-dvh bg-gradient-to-br from-amber-400 to-amber-600 flex flex-col items-center justify-center text-slate-900">
         <div className="text-8xl mb-6">🏪</div>
         <h1 className="text-4xl font-black">{storeName}</h1>
-        <p className="text-xl mt-2 opacity-80">Welcome! Kumusta po?</p>
+        <p className="text-xl mt-2 text-slate-800">Welcome! Kumusta po?</p>
       </div>
     );
   }

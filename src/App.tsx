@@ -1,10 +1,12 @@
 import { useState, useEffect } from 'react';
-import { useAppStore } from './stores/appStore';
+import { useAppStore, modeFromLocation } from './stores/appStore';
 import { useAuthStore } from './stores/authStore';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { useCloudSession } from './hooks/useCloudSession';
 import { UserInteractionPrompt } from './components/UserInteractionPrompt';
 import { ModeNav } from './components/ModeNav';
+import { ConfirmDialog } from './components/ConfirmDialog';
+import { CashierPinGate } from './components/CashierPinGate';
 import { CashierScreen } from './screens/CashierScreen';
 import { InventoryScreen } from './screens/InventoryScreen';
 import { DashboardScreen } from './screens/DashboardScreen';
@@ -38,9 +40,19 @@ function AuthGate() {
   const [isCustomerView, setIsCustomerView] = useState(window.location.hash === '#customer');
 
   useEffect(() => {
-    const handleHashChange = () => setIsCustomerView(window.location.hash === '#customer');
-    window.addEventListener('hashchange', handleHashChange);
-    return () => window.removeEventListener('hashchange', handleHashChange);
+    const syncFromUrl = () => {
+      setIsCustomerView(window.location.hash === '#customer');
+      // Back/Forward and manual hash edits change the mode; adopt it without
+      // writing another history entry.
+      const mode = modeFromLocation();
+      if (mode) useAppStore.getState().setMode(mode, { updateUrl: false });
+    };
+    window.addEventListener('hashchange', syncFromUrl);
+    window.addEventListener('popstate', syncFromUrl);
+    return () => {
+      window.removeEventListener('hashchange', syncFromUrl);
+      window.removeEventListener('popstate', syncFromUrl);
+    };
   }, []);
 
   if (isCustomerView) {
@@ -89,6 +101,7 @@ function MainApp() {
   // A returning user's role is persisted; a fresh sign-in defaults to the till.
   const role = storedRole ?? 'cashier';
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [logoutConfirmOpen, setLogoutConfirmOpen] = useState(false);
   const [lowStockCount, setLowStockCount] = useState(0);
   const isTabletOrLarger = useIsAtLeast('tablet');
 
@@ -110,7 +123,12 @@ function MainApp() {
     }
   }, [role, isTabletOrLarger]);
 
-  const handleLogout = () => {
+  // One logout path for both the header button and the drawer entry: the header
+  // used to sign out immediately while the drawer asked first.
+  const handleLogout = () => setLogoutConfirmOpen(true);
+
+  const confirmLogout = () => {
+    setLogoutConfirmOpen(false);
     // signOut() signs out of Dexie Cloud and clears the persisted role. It rejects when
     // the user dismisses the unsynced-changes confirmation, in which case the session
     // (local role included) is deliberately kept.
@@ -119,7 +137,7 @@ function MainApp() {
     });
   };
 
-  return (
+  const app = (
     <div className="min-h-dvh bg-slate-100 flex flex-col relative">
       {/* Top Header Bar with Menu Button */}
       <header className="bg-white border-b border-slate-200 px-4 py-3 flex items-center justify-between sticky top-0 z-30 shadow-xs">
@@ -138,14 +156,14 @@ function MainApp() {
               )}
             </button>
           ) : null}
-          <div>
-            <h1 className="text-base sm:text-lg font-extrabold text-slate-900">
-              {role === 'inventory' ? '📦 Inventory Portal' : '💰 Cashier POS'}
-            </h1>
+          {/* Not a heading: each screen owns exactly one h1, and this bar is
+              chrome that repeats on every screen. */}
+          <div className="text-base sm:text-lg font-extrabold text-slate-900">
+            {role === 'inventory' ? '📦 Inventory Portal' : '💰 Cashier POS'}
           </div>
         </div>
         <div className="flex items-center gap-3">
-          <span className="text-xs bg-amber-100 text-amber-900 px-3 py-1 rounded-full font-bold">
+          <span className="text-xs bg-amber-100 text-amber-900 px-3 py-1 rounded-full font-bold capitalize">
             {role}
           </span>
           <button
@@ -183,6 +201,18 @@ function MainApp() {
           </div>
         )}
       </main>
+
+      <ConfirmDialog
+        open={logoutConfirmOpen}
+        title="Log Out?"
+        message="You will be signed out of your account on this device."
+        confirmLabel="Log Out"
+        onConfirm={confirmLogout}
+        onCancel={() => setLogoutConfirmOpen(false)}
+      />
     </div>
   );
+
+  // The cashier shift is locked behind the PIN; inventory staff are not.
+  return role === 'cashier' ? <CashierPinGate>{app}</CashierPinGate> : app;
 }

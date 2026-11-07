@@ -78,7 +78,7 @@ export function ScannerScreen() {
     <div className="flex-1 flex flex-col bg-slate-50 relative overflow-y-auto pb-24">
 
       {successMessage && (
-        <div className="m-4 p-4 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-2xl font-bold flex items-center justify-between shadow-sm animate-fade-in">
+        <div className="m-4 p-4 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-2xl font-bold flex items-center justify-between shadow-sm">
           <span>✅ {successMessage}</span>
           <button onClick={() => setSuccessMessage(null)} className="text-emerald-600 text-sm">✕</button>
         </div>
