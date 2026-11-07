@@ -40,16 +40,14 @@ export interface Transaction {
 // fallback. Same pattern as the barcode-inventory app, where a missing env var on CI
 // silently folded `if (syncUrl)` to false and disabled sync entirely.
 //
-// IMPORTANT: this must be tindahan-pos's OWN Dexie Cloud database. It used to share
-// barcode-inventory's (zo7vbabeq), whose `products` table is keyed by `productId` while
-// this app keys it by `id`. Dexie Cloud refuses to change the primary key of an
-// existing table, so every sync was rejected with
-//   422 Unprocessable Content
-// and nothing ever synced — the exact failure barcode-inventory hit and fixed on its
-// side (see its commit "rename the catalog table to products, unbreaking Dexie Cloud
-// sync"). Create a separate database with `npx dexie-cloud create` and put its URL
-// here, or in VITE_DEXIE_CLOUD_SYNC_URL.
-const DEFAULT_SYNC_URL = 'https://zo7vbabeq.dexie.cloud';
+// This is tindahan-pos's OWN database. It previously shared barcode-inventory's
+// (zo7vbabeq), whose `products` table is keyed by `productId` while this app keys it
+// by `id`. Dexie Cloud refuses to change the primary key of an existing table, so
+// every sync was rejected with 422 Unprocessable Content — the same failure
+// barcode-inventory hit and fixed on its side (commit 655dc47, "rename the catalog
+// table to products, unbreaking Dexie Cloud sync"). Point this at a fresh database
+// rather than a table another app has already registered.
+const DEFAULT_SYNC_URL = 'https://z1n6s3n1x.dexie.cloud';
 
 const env = import.meta.env;
 const envSyncUrl = (env.VITE_DEXIE_CLOUD_SYNC_URL as string | undefined)?.trim();

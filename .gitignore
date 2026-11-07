@@ -12,6 +12,10 @@ dist
 dist-ssr
 *.local
 
+# Dexie Cloud local credentials (never commit — `npx dexie-cloud` writes these)
+dexie-cloud.json
+dexie-cloud.key
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
