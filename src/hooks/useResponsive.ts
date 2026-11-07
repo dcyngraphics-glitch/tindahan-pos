@@ -3,7 +3,16 @@ import { useState, useEffect } from 'react';
 export type DeviceSize = 'mobile' | 'tablet' | 'desktop';
 
 export function useDeviceSize(): DeviceSize {
-  const [size, setSize] = useState<DeviceSize>('mobile');
+  const [size, setSize] = useState<DeviceSize>(() => {
+    // Read the viewport during the first render. Starting from a hard-coded 'mobile'
+    // made every consumer act on the wrong breakpoint for one frame — App.tsx opened
+    // the inventory sidebar on tablets before the resize listener corrected it.
+    if (typeof window === 'undefined') return 'mobile';
+    const width = window.innerWidth;
+    if (width >= 1024) return 'desktop';
+    if (width >= 768) return 'tablet';
+    return 'mobile';
+  });
 
   useEffect(() => {
     const checkSize = () => {

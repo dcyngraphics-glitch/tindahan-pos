@@ -2,105 +2,79 @@ import { test, expect } from '@playwright/test';
 
 const BASE = 'http://localhost:5173';
 
-// Helper: Seed Dexie Cloud email+OTP flow
-// Note: OTP dialog is handled by Dexie Cloud natively; we simulate the post-OTP state
+// The app's own login screen only collects the ROLE. Dexie Cloud then drives the
+// email + one-time-code conversation through db.cloud.userInteraction, which
+// <UserInteractionPrompt /> renders — so `#interaction-email` / `#interaction-otp`
+// are that component's inputs, not the app's.
+//
+// A sign-in cannot be completed from a test: the code is emailed. `.test` is a
+// reserved TLD (RFC 2606), so these addresses send nothing anywhere.
+const E2E_EMAIL = 'e2e@tindahan-pos.test';
 
 test.describe('Login Flow Verification', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto(BASE);
-    // Clear any prior session
     await page.evaluate(() => localStorage.clear());
     await page.reload();
   });
 
-  test('TC-1: Cashier sets PIN for first time after OTP login', async ({ page }) => {
-    // Simulate: User clicks Sign In with Email + OTP, enters email, gets OTP
-    // (Dexie Cloud handles the OTP dialog; we assume OTP succeeded)
-    // After OTP, user is prompted for PIN since it's first time
+  test('TC-1: role selection + Sign In reaches the emailed OTP step', async ({ page }) => {
+    await expect(page.locator('h1:has-text("Tindahan ni Aling Puring")')).toBeVisible();
 
-    // Stage 1: Select Cashier role
     await page.click('button:has-text("Cashier")');
+    await page.click('button:has-text("Sign In")');
 
-    // Stage 2: PIN setup screen appears (first time)
-    await expect(page.locator('text:Enter 4-Digit PIN')).toBeVisible();
+    await expect(page.locator('#interaction-email')).toBeVisible();
+    await page.fill('#interaction-email', E2E_EMAIL);
+    await page.click('form button[type="submit"]');
 
-    // Set PIN
-    await page.fill('input[data-test="pin-input-1"]', '1');
-    await page.fill('input[data-test="pin-input-2"]', '2');
-    await page.fill('input[data-test="pin-input-3"]', '3');
-    await page.fill('input[data-test="pin-input-4"]', '4');
-
-    // Confirm PIN
-    await page.fill('input[data-test="confirm-pin-1"]', '1');
-    await page.fill('input[data-test="confirm-pin-2"]', '2');
-    await page.fill('input[data-test="confirm-pin-3"]', '3');
-    await page.fill('input[data-test="confirm-pin-4"]', '4');
-
-    // Submit PIN
-    await page.click('button:has-text("Set PIN & Continue")');
-
-    // Should now show app main screen
-    await expect(page.locator('text:Tindahan ni Aling Puring')).toBeVisible();
-    console.log('✓ TC-1: Cashier first-time PIN setup passed');
+    await expect(page.locator('#interaction-otp')).toBeVisible();
+    await expect(
+      page.locator(`text=A One-Time password has been sent to ${E2E_EMAIL}`)
+    ).toBeVisible();
   });
 
-  test('TC-2: Inventory staff logs in with same credentials', async ({ page }) => {
-    // App should still have the PIN stored from TC-1
-
-    // Inventory role should be selectable
+  test('TC-2: the selected role is persisted before the OTP is verified', async ({ page }) => {
     await page.click('button:has-text("Inventory Staff")');
-    await expect(page.locator('text:Enter 4-Digit PIN')).toBeVisible();
+    await page.click('button:has-text("Sign In")');
+    await expect(page.locator('#interaction-email')).toBeVisible();
 
-    // Enter same PIN
-    await page.fill('input[data-test="pin-input-1"]', '1');
-    await page.fill('input[data-test="pin-input-2"]', '2');
-    await page.fill('input[data-test="pin-input-3"]', '3');
-    await page.fill('input[data-test="pin-input-4"]', '4');
-
-    // Submit
-    await page.click('button:has-text("Unlock & Continue")');
-
-    // Should now show app with inventory mode
-    await expect(page.locator('text:Smart Sari-Sari POS')).toBeVisible();
-    console.log('✓ TC-2: Inventory staff login with same credentials passed');
+    const stored = await page.evaluate(() => localStorage.getItem('tindahan_auth'));
+    expect(JSON.parse(stored ?? '{}').role).toBe('inventory');
   });
 
-  test('TC-3: Same credentials on different device', async ({ page }) => {
-    // Simulate a second device (same page, simulating cellphone B)
-    // Clear and re-seed with same email/account but we test the shared-auth scenario
-    await page.evaluate(() => localStorage.clear());
-    await page.reload();
-
-    // First device: Cashier sets up
+  test('TC-3: cancelling the prompt returns to the login screen', async ({ page }) => {
     await page.click('button:has-text("Cashier")');
-    await page.fill('input[data-test="pin-input-1"]', '9');
-    await page.fill('input[data-test="pin-input-2"]', '9');
-    await page.fill('input[data-test="pin-input-3"]', '9');
-    await page.fill('input[data-test="pin-input-4"]', '9');
-    await page.click('button:has-text("Set PIN & Continue")');
-    await expect(page.locator('text:Tindahan ni Aling Puring')).toBeVisible();
+    await page.click('button:has-text("Sign In")');
+    await expect(page.locator('#interaction-email')).toBeVisible();
 
-    // Reset storage for "second device" simulation but keep PIN structure
+    await page.click('button:has-text("Cancel")');
+
+    await expect(page.locator('h1:has-text("Tindahan ni Aling Puring")')).toBeVisible();
+    await expect(page.locator('button:has-text("Sign In")')).toBeVisible();
+  });
+
+  test('TC-4: a malformed email is not submitted', async ({ page }) => {
+    await page.click('button:has-text("Cashier")');
+    await page.click('button:has-text("Sign In")');
+    await page.fill('#interaction-email', 'not-an-email');
+    await page.click('form button[type="submit"]');
+
+    // The input is type="email", so native validation blocks the submit and the
+    // email prompt is still the one on screen.
+    await expect(page.locator('#interaction-email')).toBeVisible();
+    await expect(page.locator('#interaction-otp')).toHaveCount(0);
+  });
+
+  test('TC-5: the e2e bypass renders the main app from the seeded role', async ({ page }) => {
     await page.evaluate(() => {
-      localStorage.setItem('tindahan_cashier_pin', '9999');
-      // No PIN hash set yet = will trigger setup flow on next login
+      localStorage.setItem(
+        'tindahan_auth',
+        JSON.stringify({ isAuthenticated: true, role: 'cashier' })
+      );
     });
+    await page.goto(BASE + '/?e2e=1');
 
-    // Second device (same page reload): tries with same PIN 9999
-    await page.reload();
-    await expect(page.locator('text:Enter 4-Digit PIN')).toBeVisible();
-
-    await page.fill('input[data-test="pin-input-1"]', '9');
-    await page.fill('input[data-test="pin-input-2"]', '9');
-    await page.fill('input[data-test="pin-input-3"]', '9');
-    await page.fill('input[data-test="pin-input-4"]', '9');
-    await page.click('button:has-text("Unlock & Continue")');
-
-    // If PIN matches what was stored, should gain access
-    // Since we only set pin item (no hash), this simulates the "same account" scenario
-    const pinError = page.locator('.text-red-500');
-    const pinVisible = await pinError.first().isVisible();
-    // Either no error (PIN matched existing hash from session) or we verify flow
-    console.log('✓ TC-3: Second device with same PIN attempted - flow verified');
+    await expect(page.locator('h1:has-text("Cashier POS")')).toBeVisible();
   });
 });

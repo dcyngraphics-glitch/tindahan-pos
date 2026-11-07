@@ -5,6 +5,11 @@ import { expect, type Page } from '@playwright/test';
 
 export const BASE = 'http://localhost:5173';
 
+// The app loads with `?e2e=1` so the dev-only escape hatch in services/db.ts kicks in:
+// requireAuth stays off (no emailed OTP to complete) and AuthGate renders the main app
+// from the seeded `tindahan_auth` role instead of the cloud session.
+export const APP_URL = BASE + '/?e2e=1';
+
 export interface SeedProduct {
   id: string;
   barcode: string;
@@ -36,11 +41,17 @@ export function seedDB(page: Page, products: SeedProduct[], txs: SeedTransaction
   return page.evaluate(
     ({ products, txs }) =>
       new Promise<void>((resolve, reject) => {
-        // Open the app's IndexedDB (same origin, version 1 = app's schema) and
-        // clear both tables so each test starts deterministically. Deleting
-        // the database while the app holds an open connection throws
-        // SecurityError in some contexts, so we truncate only.
-        const openReq = indexedDB.open('TindahanPOS-zo7vbabeq', 10);
+        // Open the app's IndexedDB and clear both tables so each test starts
+        // deterministically. Deleting the database while the app holds an open
+        // connection throws SecurityError in some contexts, so we truncate only.
+        //
+        // Dexie Cloud's configure() renames the local database to
+        // `<name>-<dbSuffix>`, where the suffix is the first label of the cloud
+        // hostname. Keep this in sync with DEFAULT_SYNC_URL in src/services/db.ts —
+        // it was `TindahanPOS-zo7vbabeq` while the app shared barcode-inventory's
+        // database, and a stale name here silently seeds a database the app never
+        // opens.
+        const openReq = indexedDB.open('TindahanPOS-z1n6s3n1x', 10);
         openReq.onsuccess = () => {
           const db = openReq.result;
           try {
@@ -93,7 +104,7 @@ export function loginAsDashboard(page: Page) {
 }
 
 export async function loadApp(page: Page, mode: 'history' | 'dashboard') {
-  await page.goto(BASE + '/');
+  await page.goto(APP_URL);
   await loginAsCashier(page);
   await page.evaluate((m) => { localStorage.setItem('tindahan_app_mode', m); }, mode);
   await page.reload();

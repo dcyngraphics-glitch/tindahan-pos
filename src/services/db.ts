@@ -59,6 +59,22 @@ if (!envSyncUrl) {
   );
 }
 
+/**
+ * Test-only escape hatch for the Playwright suite.
+ *
+ * A real Dexie Cloud sign-in cannot be automated: the one-time code is emailed, so no
+ * test can complete it. The authenticated specs therefore seed `tindahan_auth` and load
+ * the app with `?e2e=1`, which lets AuthGate render the main app from the seeded role
+ * instead of the cloud session.
+ *
+ * Guarded on `import.meta.env.DEV`, which Vite replaces with `false` in production
+ * builds, so the branch is dead-code-eliminated there.
+ */
+export const E2E_MODE =
+  import.meta.env.DEV &&
+  typeof window !== 'undefined' &&
+  new URLSearchParams(window.location.search).has('e2e');
+
 const db = new Dexie('TindahanPOS', { addons: [dexieCloud] }) as Dexie & {
   products: EntityTable<Product, 'id'>;
   transactions: EntityTable<Transaction, 'id'>;
@@ -68,11 +84,14 @@ try {
   if (db.cloud) {
     db.cloud.configure({
       databaseUrl: syncUrl,
-      // requireAuth:true blocks every db call until the user authenticates on first
-      // launch. The gate lives in React (AuthGate in App.tsx), so a signed-out user gets
-      // the login screen rather than a database that silently hangs. It does NOT block the
-      // OTP endpoint — that is what an earlier commit assumed when it removed this flag.
-      requireAuth: true,
+      // Deliberately NOT requireAuth:true. With it, the addon starts its own login
+      // prompt from Dexie's `ready` handler as soon as the database opens — before the
+      // user can touch the role picker, so a first-time user could only ever be a
+      // cashier (there is no role switcher elsewhere in the app). Auth is gated in
+      // React instead (AuthGate in App.tsx): db.cloud.currentUser drives it, and
+      // `cloudLogin()` starts the OTP flow from the Sign In button, after the role is
+      // known. See https://dexie.org/docs/cloud/dexie-cloud-addon
+      requireAuth: false,
       // The app renders the login prompts itself from db.cloud.userInteraction (see
       // components/UserInteractionPrompt.tsx) so they carry this app's styling. Without
       // this the addon injects its own generic dialog on top of the UI.

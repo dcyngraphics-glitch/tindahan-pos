@@ -12,7 +12,7 @@ import { ScannerScreen } from './screens/ScannerScreen';
 import { TransactionHistoryScreen } from './screens/TransactionHistoryScreen';
 import { CustomerDisplay } from './screens/CustomerDisplayScreen';
 import { LoginScreen } from './components/LoginScreen';
-import { seedCatalogIfEmpty } from './services/db';
+import { seedCatalogIfEmpty, E2E_MODE } from './services/db';
 import { getLowStockProducts } from './services/products';
 import { useIsAtLeast } from './hooks/useResponsive';
 
@@ -34,6 +34,7 @@ export default function App() {
  */
 function AuthGate() {
   const { isLoading, isLoggedIn, error } = useCloudSession();
+  const { role: storedRole } = useAuthStore();
   const [isCustomerView, setIsCustomerView] = useState(window.location.hash === '#customer');
 
   useEffect(() => {
@@ -46,9 +47,17 @@ function AuthGate() {
     return <CustomerDisplay />;
   }
 
+  // E2E_MODE (see services/db.ts) renders the main app from the seeded `tindahan_auth`
+  // role instead of waiting for a cloud session no test can complete. Tying it to the
+  // seeded role (rather than to the flag alone) is what lets the logout tests work:
+  // once logout clears the role, the gate falls back to the login screen.
+  const showMain = isLoggedIn || (E2E_MODE && storedRole !== null);
+
   return (
     <>
-      {isLoading ? (
+      {showMain ? (
+        <MainApp />
+      ) : isLoading ? (
         <div className="min-h-dvh bg-gradient-to-br from-amber-500 via-amber-600 to-slate-900 flex items-center justify-center p-4">
           <p className="text-white text-lg font-extrabold">Loading...</p>
         </div>
@@ -61,8 +70,6 @@ function AuthGate() {
             <p className="text-sm text-slate-600">{error}</p>
           </div>
         </div>
-      ) : isLoggedIn ? (
-        <MainApp />
       ) : (
         <LoginScreen />
       )}
