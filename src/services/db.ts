@@ -34,24 +34,57 @@ export interface Transaction {
   discount?: { type: 'percent' | 'fixed'; value: number } | null;
 }
 
+// --- Build-time sync config -------------------------------------------------
+// Vite inlines import.meta.env at BUILD time, so a value coming from .env must exist
+// when the bundle is compiled. The env var wins when present; the constant is the
+// fallback. Same pattern as the barcode-inventory app, where a missing env var on CI
+// silently folded `if (syncUrl)` to false and disabled sync entirely.
+//
+// IMPORTANT: this must be tindahan-pos's OWN Dexie Cloud database. It used to share
+// barcode-inventory's (zo7vbabeq), whose `products` table is keyed by `productId` while
+// this app keys it by `id`. Dexie Cloud refuses to change the primary key of an
+// existing table, so every sync was rejected with
+//   422 Unprocessable Content
+// and nothing ever synced — the exact failure barcode-inventory hit and fixed on its
+// side (see its commit "rename the catalog table to products, unbreaking Dexie Cloud
+// sync"). Create a separate database with `npx dexie-cloud create` and put its URL
+// here, or in VITE_DEXIE_CLOUD_SYNC_URL.
+const DEFAULT_SYNC_URL = 'https://zo7vbabeq.dexie.cloud';
+
+const env = import.meta.env;
+const envSyncUrl = (env.VITE_DEXIE_CLOUD_SYNC_URL as string | undefined)?.trim();
+const syncUrl = envSyncUrl || DEFAULT_SYNC_URL;
+
+if (!envSyncUrl) {
+  console.warn(
+    '[dexie] VITE_DEXIE_CLOUD_SYNC_URL is not set — falling back to DEFAULT_SYNC_URL.'
+  );
+}
+
 const db = new Dexie('TindahanPOS', { addons: [dexieCloud] }) as Dexie & {
   products: EntityTable<Product, 'id'>;
   transactions: EntityTable<Transaction, 'id'>;
 };
 
-if (db.cloud) {
-  db.cloud.configure({
-    databaseUrl: 'https://zo7vbabeq.dexie.cloud',
-    // requireAuth:true blocks every db call until the user authenticates on first
-    // launch. The gate lives in React (AuthGate in App.tsx), so a signed-out user gets
-    // the login screen rather than a database that silently hangs. It does NOT block the
-    // OTP endpoint — that is what an earlier commit assumed when it removed this flag.
-    requireAuth: true,
-    // The app renders the login prompts itself from db.cloud.userInteraction (see
-    // components/UserInteractionPrompt.tsx) so they carry this app's styling. Without
-    // this the addon injects its own generic dialog on top of the UI.
-    customLoginGui: true,
-  });
+try {
+  if (db.cloud) {
+    db.cloud.configure({
+      databaseUrl: syncUrl,
+      // requireAuth:true blocks every db call until the user authenticates on first
+      // launch. The gate lives in React (AuthGate in App.tsx), so a signed-out user gets
+      // the login screen rather than a database that silently hangs. It does NOT block the
+      // OTP endpoint — that is what an earlier commit assumed when it removed this flag.
+      requireAuth: true,
+      // The app renders the login prompts itself from db.cloud.userInteraction (see
+      // components/UserInteractionPrompt.tsx) so they carry this app's styling. Without
+      // this the addon injects its own generic dialog on top of the UI.
+      customLoginGui: true,
+    });
+  } else {
+    console.warn('[dexie] Dexie Cloud addon not initialized — sync disabled');
+  }
+} catch (err) {
+  console.error('[dexie] Failed to configure Dexie Cloud:', err);
 }
 
 db.version(1).stores({
