@@ -23,7 +23,6 @@ export function InventoryScreen() {
   const [sortBy, setSortBy] = useState<'name-asc' | 'name-desc' | 'price-asc' | 'price-desc' | 'stock-asc' | 'stock-desc'>('name-asc');
   const [categoryFilter, setCategoryFilter] = useState<string>('all');
   const [page, setPage] = useState(1);
-  const [manualBarcode] = useState(() => 'manual-' + Date.now());
 
   const loadProducts = useCallback(async () => {
     const data = query ? await searchProducts(query) : await getAllProducts();
@@ -137,7 +136,7 @@ export function InventoryScreen() {
             <ProductForm
               key={editingProduct?.id || 'new'}
               initial={editingProduct || undefined}
-              barcode={editingProduct?.barcode || manualBarcode}
+              barcode={editingProduct?.barcode || scannedBarcode || 'manual-' + Date.now()}
               onSave={handleSave}
               onCancel={() => setEditingProduct(null)}
               inline

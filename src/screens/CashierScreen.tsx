@@ -820,10 +820,19 @@ export function CashierScreen() {
                 Close
               </button>
               <button
-                onClick={closeReceipt}
-                className="w-full py-3 bg-amber-500 hover:bg-amber-600 text-slate-900 font-extrabold rounded-xl transition"
+                onClick={() => { setVoidConfirmOpen(true); }}
+                className="w-full py-3 bg-red-50 hover:bg-red-100 text-red-600 font-bold rounded-xl border border-red-200 text-sm transition"
               >
-                Next Customer →
+                ⚠️ Void Transaction
+              </button>
+              <button onClick={closeReceipt} className="w-full py-3 bg-amber-500 hover:bg-amber-600 text-slate-900 font-extrabold rounded-xl transition">
+                Close
+              </button>
+              <button
+                onClick={() => { setVoidConfirmOpen(true); }}
+                className="w-full py-3 bg-red-50 hover:bg-red-100 text-red-600 font-bold rounded-xl border border-red-200 text-sm transition"
+              >
+                ⚠️ Void Transaction
               </button>
               <button
                 onClick={handleVoidCurrentReceipt}
