@@ -32,16 +32,6 @@ export function LoginScreen() {
     }
   }, []);
 
-  // Check for existing PIN on mount
-  useEffect(() => {
-    const savedPin = typeof window !== 'undefined' ? localStorage.getItem('tindahan_cashier_pin_hash') : null;
-    if (savedPin) {
-      setPinStage('verify');
-    } else {
-      setPinStage('setup');
-    }
-  }, []);
-
   const triggerShake = () => {
     if (cardRef.current) {
       gsap.to(cardRef.current, {
