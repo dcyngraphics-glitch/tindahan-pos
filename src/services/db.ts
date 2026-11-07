@@ -49,15 +49,11 @@ export interface Transaction {
 // rather than a table another app has already registered.
 const DEFAULT_SYNC_URL = 'https://z1n6s3n1x.dexie.cloud';
 
+// The env var is an optional override only; DEFAULT_SYNC_URL below is the real default
+// and is correct as committed, so a missing env var is not worth logging about.
 const env = import.meta.env;
-const envSyncUrl = (env.VITE_DEXIE_CLOUD_SYNC_URL as string | undefined)?.trim();
-const syncUrl = envSyncUrl || DEFAULT_SYNC_URL;
-
-if (!envSyncUrl) {
-  console.warn(
-    '[dexie] VITE_DEXIE_CLOUD_SYNC_URL is not set — falling back to DEFAULT_SYNC_URL.'
-  );
-}
+const syncUrl =
+  (env.VITE_DEXIE_CLOUD_SYNC_URL as string | undefined)?.trim() || DEFAULT_SYNC_URL;
 
 /**
  * Test-only escape hatch for the Playwright suite.
@@ -79,6 +75,14 @@ const db = new Dexie('TindahanPOS', { addons: [dexieCloud] }) as Dexie & {
   products: EntityTable<Product, 'id'>;
   transactions: EntityTable<Transaction, 'id'>;
 };
+
+// Declare the schema BEFORE configure(), the same order the working barcode-inventory
+// app uses. Dexie applies db.version().stores() to the instance either way, but keeping
+// the proven order means one less difference to reason about when debugging sync.
+db.version(1).stores({
+  products: 'id, barcode, name, category, createdAt',
+  transactions: 'id, createdAt',
+});
 
 try {
   if (db.cloud) {
@@ -103,11 +107,6 @@ try {
 } catch (err) {
   console.error('[dexie] Failed to configure Dexie Cloud:', err);
 }
-
-db.version(1).stores({
-  products: 'id, barcode, name, category, createdAt',
-  transactions: 'id, createdAt',
-});
 
 export { db };
 

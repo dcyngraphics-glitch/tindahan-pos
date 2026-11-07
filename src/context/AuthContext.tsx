@@ -61,11 +61,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     //    the emailed code, and the addon does not expose it — so a second
     //    login({ email, otp }) cannot verify anything and only requests a fresh code.
     // grant_type:'otp' asks for the email prompt rather than the provider chooser.
-    cloud.login({ grant_type: 'otp' }).catch((err: any) => {
-      if (err?.name === 'OAuthRedirectError') return; // page is redirecting for OAuth
-      if (err?.name === 'AbortError') return; // the user dismissed the prompt
-      setCloudError(err?.message || 'Sign in failed. Please try again.');
-    });
+    cloud
+      .login({ grant_type: 'otp' })
+      .then(() => {
+        // requireAuth is false (see services/db.ts), so the addon's ready handler already
+        // ran its initial sync BEFORE this user existed — unauthenticated, so it could
+        // not produce a serverRevision, and the WebSocket refuses to connect until one
+        // exists. login() does fire its own resync, but that goes through the local sync
+        // worker with the schema it captured at startup. Pull explicitly now that we
+        // actually hold a token, so the first sync and the socket both come up.
+        return cloud.sync({ purpose: 'pull', wait: true });
+      })
+      .catch((err: any) => {
+        if (err?.name === 'OAuthRedirectError') return; // page is redirecting for OAuth
+        if (err?.name === 'AbortError') return; // the user dismissed the prompt
+        setCloudError(err?.message || 'Sign in failed. Please try again.');
+      });
   }, []);
 
   const cloudLogout = useCallback(async (): Promise<void> => {
