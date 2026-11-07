@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useHardwareStore } from '../stores/hardwareStore';
 import { useSettingsStore } from '../stores/settingsStore';
 import { useAuthStore } from '../stores/authStore';
+import { useAuth } from '../context/AuthContext';
 import { connectBluetoothScanner } from '../services/bluetoothScanner';
 import { connectSerialScanner } from '../services/serialScanner';
 import { useBluetoothStatus } from '../hooks/useBluetoothStatus';
@@ -11,7 +12,8 @@ interface DeveloperSettingsModalProps {
 }
 
 export function DeveloperSettingsModal({ onClose }: DeveloperSettingsModalProps) {
-  const { logout, role } = useAuthStore();
+  const { role } = useAuthStore();
+  const { signOut } = useAuth();
   const { darkMode, setDarkMode, receiptConfig, updateReceiptConfig } = useSettingsStore();
   const { isPrinterConnected, printerName, isScannerConnected, scannerName, isSerialConnected, setScanner, setSerialScanner, disconnectPrinter, disconnectScanner, disconnectSerialScanner } = useHardwareStore();
   const { connectPrinter } = useBluetoothStatus();
@@ -130,7 +132,7 @@ export function DeveloperSettingsModal({ onClose }: DeveloperSettingsModalProps)
             <p className="font-bold text-slate-900">{role}</p>
           </div>
           <button
-            onClick={() => { logout(); onClose(); }}
+            onClick={() => { onClose(); void signOut(); }}
             className="px-4 py-2 bg-red-100 hover:bg-red-200 text-red-700 font-bold text-xs rounded-xl transition"
           >
             Log Out 🚪

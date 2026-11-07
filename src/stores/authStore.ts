@@ -6,7 +6,7 @@ export type UserRole = 'cashier' | 'inventory';
 export interface AuthState {
   isAuthenticated: boolean;
   role: UserRole | null;
-  login: (role: UserRole, email: string) => void;
+  login: (role: UserRole) => void;
   logout: () => void;
 }
 
@@ -43,7 +43,7 @@ const initialAuth = loadAuthState();
 export const useAuthStore = create<AuthState>((set) => ({
   isAuthenticated: initialAuth.isAuthenticated,
   role: initialAuth.role,
-  login: (role, _email) => {
+  login: (role: UserRole) => {
     const authState = { isAuthenticated: true, role };
     try {
       localStorage.setItem('tindahan_auth', JSON.stringify(authState));

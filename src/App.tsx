@@ -1,6 +1,9 @@
 import { useState, useEffect } from 'react';
 import { useAppStore } from './stores/appStore';
 import { useAuthStore } from './stores/authStore';
+import { AuthProvider, useAuth } from './context/AuthContext';
+import { useCloudSession } from './hooks/useCloudSession';
+import { UserInteractionPrompt } from './components/UserInteractionPrompt';
 import { ModeNav } from './components/ModeNav';
 import { CashierScreen } from './screens/CashierScreen';
 import { InventoryScreen } from './screens/InventoryScreen';
@@ -14,11 +17,23 @@ import { getLowStockProducts } from './services/products';
 import { useIsAtLeast } from './hooks/useResponsive';
 
 export default function App() {
-  const { mode } = useAppStore();
-  const { isAuthenticated, role, logout } = useAuthStore();
-  const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [lowStockCount, setLowStockCount] = useState(0);
-  const isTabletOrLarger = useIsAtLeast('tablet');
+  return (
+    <AuthProvider>
+      <AuthGate />
+    </AuthProvider>
+  );
+}
+
+/**
+ * The app's gate: nobody reaches the POS without a Dexie Cloud account.
+ *
+ * Three states, because "not signed in yet" and "still reading the session from
+ * storage" are different: db.cloud.currentUser starts as UNAUTHORIZED_USER with
+ * isLoading:true, and rendering the login screen during that window would flash it on
+ * every cold start for users who are perfectly well signed in.
+ */
+function AuthGate() {
+  const { isLoading, isLoggedIn, error } = useCloudSession();
   const [isCustomerView, setIsCustomerView] = useState(window.location.hash === '#customer');
 
   useEffect(() => {
@@ -26,6 +41,49 @@ export default function App() {
     window.addEventListener('hashchange', handleHashChange);
     return () => window.removeEventListener('hashchange', handleHashChange);
   }, []);
+
+  if (isCustomerView) {
+    return <CustomerDisplay />;
+  }
+
+  return (
+    <>
+      {isLoading ? (
+        <div className="min-h-dvh bg-gradient-to-br from-amber-500 via-amber-600 to-slate-900 flex items-center justify-center p-4">
+          <p className="text-white text-lg font-extrabold">Loading...</p>
+        </div>
+      ) : error ? (
+        // The local database is the app. If it cannot be opened there is nothing useful
+        // to show, so say so plainly instead of spinning forever.
+        <div className="min-h-dvh bg-gradient-to-br from-amber-500 via-amber-600 to-slate-900 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6 text-center">
+            <h1 className="text-lg font-black text-slate-900 mb-2">Storage unavailable</h1>
+            <p className="text-sm text-slate-600">{error}</p>
+          </div>
+        </div>
+      ) : isLoggedIn ? (
+        <MainApp />
+      ) : (
+        <LoginScreen />
+      )}
+
+      {/* Mounted at the root, not inside a branch, so db.cloud.userInteraction is
+          always observed — the login prompts need it while signed out, and the
+          "unsynced changes" logout confirmation can fire from any screen. */}
+      <UserInteractionPrompt />
+    </>
+  );
+}
+
+function MainApp() {
+  const { mode } = useAppStore();
+  const { role: storedRole } = useAuthStore();
+  const { signOut } = useAuth();
+  // A returning user's role is persisted; a fresh sign-in defaults to the till.
+  const role = storedRole ?? 'cashier';
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [lowStockCount, setLowStockCount] = useState(0);
+  const isTabletOrLarger = useIsAtLeast('tablet');
 
   useEffect(() => {
     seedCatalogIfEmpty().then(() => {
@@ -45,13 +103,14 @@ export default function App() {
     }
   }, [role, isTabletOrLarger]);
 
-  if (isCustomerView) {
-    return <CustomerDisplay />;
-  }
-
-  if (!isAuthenticated) {
-    return <LoginScreen />;
-  }
+  const handleLogout = () => {
+    // signOut() signs out of Dexie Cloud and clears the persisted role. It rejects when
+    // the user dismisses the unsynced-changes confirmation, in which case the session
+    // (local role included) is deliberately kept.
+    void signOut().catch((err: unknown) => {
+      console.error('[auth] Sign-out failed:', err);
+    });
+  };
 
   return (
     <div className="min-h-dvh bg-slate-100 flex flex-col relative">
@@ -83,7 +142,7 @@ export default function App() {
             {role}
           </span>
           <button
-            onClick={() => logout()}
+            onClick={handleLogout}
             className="px-3 py-1.5 bg-slate-100 hover:bg-red-50 hover:text-red-600 text-slate-700 text-xs font-bold rounded-xl transition min-h-[44px]"
           >
             Logout

@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useAppStore, type AppMode } from '../stores/appStore';
 import { useAuthStore } from '../stores/authStore';
+import { useAuth } from '../context/AuthContext';
 import { DeveloperSettingsModal } from './DeveloperSettingsModal';
 
 interface ModeNavProps {
@@ -12,6 +13,7 @@ interface ModeNavProps {
 export function ModeNav({ isOpen, onClose, lowStockCount = 0 }: ModeNavProps) {
   const { mode, setMode } = useAppStore();
   const { role } = useAuthStore();
+  const { signOut } = useAuth();
   const [devSettingsOpen, setDevSettingsOpen] = useState(false);
   const [logoutConfirmOpen, setLogoutConfirmOpen] = useState(false);
 
@@ -128,7 +130,7 @@ export function ModeNav({ isOpen, onClose, lowStockCount = 0 }: ModeNavProps) {
               <button
                 onClick={() => {
                   setLogoutConfirmOpen(false);
-                  useAuthStore.getState().logout();
+                  void signOut();
                 }}
                 className="flex-1 py-3 px-4 bg-red-600 hover:bg-red-700 text-white font-semibold rounded-xl min-h-[44px] transition"
               >
