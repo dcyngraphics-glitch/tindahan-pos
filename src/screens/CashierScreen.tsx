@@ -527,7 +527,10 @@ export function CashierScreen() {
                   {printing ? 'Connecting...' : '🖨️ Web Bluetooth Print'}
                 </button>
                 <button
-                  onClick={() => window.print()}
+                  onClick={() => {
+                    document.body.classList.add('printing');
+                    window.print();
+                  }}
                   className="w-full py-3 bg-slate-800 hover:bg-slate-900 text-white font-semibold rounded-xl transition flex items-center justify-center gap-2"
                 >
                   🖨️ Windows / System Print (All Printers)

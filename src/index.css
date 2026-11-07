@@ -45,10 +45,17 @@ body {
   body * {
     visibility: hidden;
   }
-  .printable-receipt, .printable-receipt * {
+  body.printing * {
     visibility: visible;
   }
-  .printable-receipt {
+  body.printing .receipt,
+  body.printing .receipt-preview,
+  body.printing .receipt *,
+  body.printing .receipt-preview * {
+    visibility: visible;
+  }
+  body.printing .receipt,
+  body.printing .receipt-preview {
     position: absolute;
     left: 0;
     top: 0;
