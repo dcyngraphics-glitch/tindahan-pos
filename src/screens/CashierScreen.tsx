@@ -125,7 +125,8 @@ export function CashierScreen() {
       return;
     }
     const cash = parseFloat(cashTendered);
-    if (isNaN(cash) || cash * 100 < total) {
+    const cashCents = Math.round(cash * 100);
+    if (isNaN(cash) || cashCents < total) {
       showToast('Insufficient cash');
       return;
     }
@@ -434,7 +435,7 @@ export function CashierScreen() {
                     value={cashTendered}
                     onChange={e => setCashTendered(e.target.value)}
                     onKeyDown={e => {
-                      if (e.key === 'Enter' && cashTendered && parseFloat(cashTendered) * 100 >= total) {
+                      if (e.key === 'Enter' && cashTendered && Math.round(parseFloat(cashTendered) * 100) >= total) {
                         handleCheckout();
                       }
                     }}
@@ -467,15 +468,15 @@ export function CashierScreen() {
               {cashTendered && !isNaN(parseFloat(cashTendered)) && (
                 <div className="bg-slate-50 p-4 rounded-2xl flex justify-between items-center">
                   <span className="font-bold text-slate-600">Change</span>
-                  <span className={`text-2xl font-black ${parseFloat(cashTendered) * 100 >= total ? 'text-green-600' : 'text-red-700'}`}>
-                    {parseFloat(cashTendered) * 100 >= total ? formatPeso(parseFloat(cashTendered) * 100 - total) : 'Insufficient Cash'}
+                  <span className={`text-2xl font-black ${Math.round(parseFloat(cashTendered) * 100) >= total ? 'text-green-600' : 'text-red-700'}`}>
+                    {Math.round(parseFloat(cashTendered) * 100) >= total ? formatPeso(Math.round(parseFloat(cashTendered) * 100) - total) : 'Insufficient Cash'}
                   </span>
                 </div>
               )}
 
               <button
                 onClick={handleCheckout}
-                disabled={!cashTendered || parseFloat(cashTendered) * 100 < total}
+                disabled={!cashTendered || Math.round(parseFloat(cashTendered) * 100) < total}
                 className="w-full py-4 bg-amber-500 hover:bg-amber-600 text-slate-900 font-extrabold text-lg rounded-2xl shadow-lg disabled:opacity-40 transition"
               >
                 Complete Payment & Print Receipt ✓
@@ -748,15 +749,15 @@ export function CashierScreen() {
             {cashTendered && !isNaN(parseFloat(cashTendered)) && (
               <div className="bg-slate-50 p-4 rounded-2xl flex justify-between items-center">
                 <span className="font-bold text-slate-600">Change</span>
-                <span className={`text-2xl font-black ${parseFloat(cashTendered) * 100 >= total ? 'text-green-600' : 'text-red-700'}`}>
-                  {parseFloat(cashTendered) * 100 >= total ? formatPeso(parseFloat(cashTendered) * 100 - total) : 'Insufficient Cash'}
+                <span className={`text-2xl font-black ${Math.round(parseFloat(cashTendered) * 100) >= total ? 'text-green-600' : 'text-red-700'}`}>
+                  {Math.round(parseFloat(cashTendered) * 100) >= total ? formatPeso(Math.round(parseFloat(cashTendered) * 100) - total) : 'Insufficient Cash'}
                 </span>
               </div>
             )}
 
             <button
               onClick={handleCheckout}
-              disabled={!cashTendered || parseFloat(cashTendered) * 100 < total}
+              disabled={!cashTendered || Math.round(parseFloat(cashTendered) * 100) < total}
               className="w-full py-4 bg-amber-500 hover:bg-amber-600 text-slate-900 font-extrabold text-lg rounded-2xl shadow-lg disabled:opacity-40 transition"
             >
               Complete Payment & Print Receipt ✓
