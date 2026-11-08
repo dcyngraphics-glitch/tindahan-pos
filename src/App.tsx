@@ -100,6 +100,9 @@ function MainApp() {
   const { signOut } = useAuth();
   // A returning user's role is persisted; a fresh sign-in defaults to the till.
   const role = storedRole ?? 'cashier';
+  // Which Dexie Cloud account this device is signed in as — the answer to
+  // "whose device is this?" when two people share one store.
+  const { email: accountEmail } = useCloudSession();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [logoutConfirmOpen, setLogoutConfirmOpen] = useState(false);
   const [lowStockCount, setLowStockCount] = useState(0);
@@ -157,9 +160,20 @@ function MainApp() {
             </button>
           ) : null}
           {/* Not a heading: each screen owns exactly one h1, and this bar is
-              chrome that repeats on every screen. */}
-          <div className="text-base sm:text-lg font-extrabold text-slate-900">
-            {role === 'inventory' ? '📦 Inventory Portal' : '💰 Cashier POS'}
+              chrome that repeats on every screen. The account line underneath
+              shows which email this device is signed in as. */}
+          <div className="min-w-0">
+            <div className="text-base sm:text-lg font-extrabold text-slate-900 leading-tight">
+              {role === 'inventory' ? '📦 Inventory Portal' : '💰 Cashier POS'}
+            </div>
+            {accountEmail && (
+              <div
+                className="text-xs text-slate-500 leading-tight truncate max-w-[160px] sm:max-w-[280px]"
+                title={accountEmail}
+              >
+                ✉ {accountEmail}
+              </div>
+            )}
           </div>
         </div>
         <div className="flex items-center gap-3">

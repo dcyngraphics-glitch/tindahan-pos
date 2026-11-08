@@ -6,6 +6,7 @@ import { useAuth } from '../context/AuthContext';
 import { connectBluetoothScanner } from '../services/bluetoothScanner';
 import { connectSerialScanner } from '../services/serialScanner';
 import { useBluetoothStatus } from '../hooks/useBluetoothStatus';
+import { useCloudSession } from '../hooks/useCloudSession';
 import { getCashierPinHash, setCashierPinHash, hashPin } from '../services/cashierPin';
 
 interface DeveloperSettingsModalProps {
@@ -14,6 +15,7 @@ interface DeveloperSettingsModalProps {
 
 export function DeveloperSettingsModal({ onClose }: DeveloperSettingsModalProps) {
   const { role } = useAuthStore();
+  const { email: accountEmail } = useCloudSession();
   const { signOut } = useAuth();
   const { receiptConfig, updateReceiptConfig } = useSettingsStore();
   const { isPrinterConnected, printerName, isScannerConnected, scannerName, isSerialConnected, setScanner, setSerialScanner, disconnectPrinter, disconnectScanner, disconnectSerialScanner } = useHardwareStore();
@@ -106,7 +108,9 @@ export function DeveloperSettingsModal({ onClose }: DeveloperSettingsModalProps)
             <span className="text-2xl">🛠️</span>
             <div>
               <h2 className="text-xl font-black text-slate-900">Developer & Hardware Settings</h2>
-              <p className="text-xs text-slate-500">Logged in as {role} ({role})</p>
+              <p className="text-xs text-slate-500">
+                Signed in as {accountEmail || (role === 'cashier' ? 'Cashier' : 'Inventory Staff')}
+              </p>
             </div>
           </div>
           <button
@@ -121,7 +125,8 @@ export function DeveloperSettingsModal({ onClose }: DeveloperSettingsModalProps)
         <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200 mb-6 flex justify-between items-center">
           <div>
             <p className="text-xs font-bold text-slate-500 uppercase">Active Session</p>
-            <p className="font-bold text-slate-900">{role}</p>
+            <p className="font-bold text-slate-900">{role === 'cashier' ? 'Cashier' : 'Inventory Staff'}</p>
+            {accountEmail && <p className="text-xs text-slate-500">{accountEmail}</p>}
           </div>
           <button
             onClick={() => { onClose(); void signOut(); }}

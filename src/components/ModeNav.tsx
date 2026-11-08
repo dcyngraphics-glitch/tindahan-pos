@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useAppStore, type AppMode } from '../stores/appStore';
 import { useAuthStore } from '../stores/authStore';
 import { useAuth } from '../context/AuthContext';
+import { useCloudSession } from '../hooks/useCloudSession';
 import { DeveloperSettingsModal } from './DeveloperSettingsModal';
 import { ConfirmDialog } from './ConfirmDialog';
 
@@ -14,6 +15,7 @@ interface ModeNavProps {
 export function ModeNav({ isOpen, onClose, lowStockCount = 0 }: ModeNavProps) {
   const { mode, setMode } = useAppStore();
   const { role } = useAuthStore();
+  const { email: accountEmail } = useCloudSession();
   const { signOut } = useAuth();
   const [devSettingsOpen, setDevSettingsOpen] = useState(false);
   const [logoutConfirmOpen, setLogoutConfirmOpen] = useState(false);
@@ -53,9 +55,16 @@ export function ModeNav({ isOpen, onClose, lowStockCount = 0 }: ModeNavProps) {
         aria-label="Main Navigation"
       >
         <div className="flex justify-between items-center px-2 mb-6 border-b pb-3">
-          <div className="flex items-center gap-2">
-            <span className="text-xl">🏪</span>
-            <span className="font-extrabold text-slate-800">Tindahan POS</span>
+          <div className="flex items-center gap-2 min-w-0">
+            <span className="text-xl shrink-0">🏪</span>
+            <div className="min-w-0">
+              <span className="font-extrabold text-slate-800">Tindahan POS</span>
+              {accountEmail && (
+                <div className="text-xs text-slate-500 truncate max-w-[180px]" title={accountEmail}>
+                  ✉ {accountEmail}
+                </div>
+              )}
+            </div>
           </div>
           <button
             onClick={onClose}
