@@ -16,6 +16,7 @@ const receiptDate = () => new Date();
 
 export function CashierScreen() {
   const isTabletOrLarger = useIsAtLeast('tablet');
+  const isDesktopOrLarger = useIsAtLeast('desktop');
   const { items, addItem, removeItem, updateQuantity, clearCart, getTotal, getDiscountedTotal, discount, setDiscount } = useCartStore();
   const { isConnected: scannerConnected, activityCount: scannerActivity } = useScannerDetection();
   const { isConnected: printerConnected, printerName, connectPrinter } = useBluetoothStatus();
@@ -28,7 +29,7 @@ export function CashierScreen() {
   // catalogue, the form opens pre-filled so the cashier only adjusts price and stock.
   const [seedPrefill, setSeedPrefill] = useState<Product | null>(null);
   const [printing, setPrinting] = useState(false);
-  const [quickTapExpanded, setQuickTapExpanded] = useState(true);
+  const [quickTapExpanded, setQuickTapExpanded] = useState(isDesktopOrLarger);
   const [products, setProducts] = useState<Product[]>([]);
   const [voidConfirmOpen, setVoidConfirmOpen] = useState(false);
 
@@ -291,11 +292,11 @@ export function CashierScreen() {
 
   if (isTabletOrLarger) {
     return (
-      <div className="flex-1 flex flex-col lg:flex-row overflow-hidden h-full">
+      <div className="flex-1 flex flex-row overflow-hidden min-h-0">
         {/* Left Pane: Cart & Quick Actions */}
-        <div className="flex-1 flex flex-col h-full overflow-hidden border-r border-slate-200 bg-white">
-          <header className="p-4 border-b border-slate-200 flex justify-between items-center">
-            <div className="flex items-center gap-3">
+        <div className="flex-1 flex flex-col min-h-0 self-stretch overflow-hidden border-r border-slate-200 bg-white">
+          <header className="p-4 border-b border-slate-200 flex justify-between items-center gap-3 flex-shrink-0">
+            <div className="flex items-center gap-3 min-w-0">
               <div>
                 <h1 className="text-xl font-bold">Cashier</h1>
                 <div className="flex items-center gap-3 text-xs mt-0.5">
@@ -314,6 +315,13 @@ export function CashierScreen() {
                 </div>
               </div>
             </div>
+            <button
+              onClick={() => setQuickTapExpanded(!quickTapExpanded)}
+              aria-expanded={quickTapExpanded}
+              className="shrink-0 px-3 py-2 rounded-xl bg-amber-50 text-amber-800 border border-amber-200 text-xs font-bold hover:bg-amber-100 transition min-h-[44px]"
+            >
+              ⚡ QuickTap {quickTapExpanded ? 'On' : 'Off'}
+            </button>
           </header>
 
           {notFound && (
@@ -341,9 +349,9 @@ export function CashierScreen() {
             </div>
           )}
 
-          {/* Cart section (scrollable) + Footer (sticky to bottom) */}
-          <div className="flex-1 flex flex-col overflow-y-auto border-r border-slate-200 bg-slate-50">
-            <div className="flex-1 overflow-y-auto p-4 space-y-3">
+          {/* The cart list scrolls on its own; the checkout footer below it is a
+              plain flex child, so it stays pinned to the bottom of the pane. */}
+          <div className="flex-1 min-h-0 overflow-y-auto p-4 space-y-3 bg-slate-50">
               {items.length === 0 ? (
                 <div className="text-center py-16 text-slate-400">
                   <p className="text-5xl mb-4">🛒</p>
@@ -387,8 +395,8 @@ export function CashierScreen() {
               )}
             </div>
 
-            {/* Checkout Footer - sticky to bottom, separate from cart items */}
-            <div className="p-4 bg-white border-t border-slate-200 flex justify-between items-center sticky bottom-0 z-30 shadow-2xl flex-shrink-0">
+            {/* Checkout Footer - pinned to the bottom of the pane */}
+            <div className="p-4 bg-white border-t border-slate-200 flex justify-between items-center flex-shrink-0 shadow-2xl">
               <div>
                 <p className="text-sm text-slate-500">Total Items: {items.reduce((sum, i) => sum + i.quantity, 0)}</p>
                 <p className="text-3xl font-black text-slate-900">{formatPeso(total)}</p>
@@ -410,29 +418,31 @@ export function CashierScreen() {
                 </button>
               </div>
             </div>
-          </div>
         </div>
 
-        {/* Right Pane: QuickTap Grid */}
-        <div className="w-full lg:w-[480px] bg-slate-50 flex flex-col border-l border-slate-200 overflow-hidden">
-          <div className="p-4 border-b border-slate-200 bg-white flex justify-between items-center">
-            <div>
-              <h2 className="font-bold text-slate-800">⚡ QuickTap 4x4 Products</h2>
-              <p className="text-xs text-slate-400">Click '+ Add QuickTap' to pin products</p>
+        {/* Right Pane: QuickTap Grid. Only rendered while expanded, so the cart
+            takes the full width when it is collapsed — a permanent pane at
+            tablet widths would either starve the cart or push the checkout
+            footer down the screen. */}
+        {quickTapExpanded && (
+          <div className="w-[400px] lg:w-[480px] flex flex-col border-l border-slate-200 overflow-hidden flex-shrink-0 bg-slate-50">
+            <div className="p-4 border-b border-slate-200 bg-white flex justify-between items-center flex-shrink-0">
+              <div>
+                <h2 className="font-bold text-slate-800">⚡ QuickTap 4x4 Products</h2>
+                <p className="text-xs text-slate-400">Click '+ Add QuickTap' to pin products</p>
+              </div>
+              <button
+                onClick={() => setQuickTapExpanded(false)}
+                className="text-xs text-amber-600 font-bold hover:underline min-h-[44px]"
+              >
+                Hide
+              </button>
             </div>
-            <button
-              onClick={() => setQuickTapExpanded(!quickTapExpanded)}
-              className="text-xs text-amber-600 font-bold hover:underline"
-            >
-              {quickTapExpanded ? 'Collapse' : 'Expand'}
-            </button>
-          </div>
-          {quickTapExpanded && (
-            <div className="flex-1 overflow-y-auto p-2">
+            <div className="flex-1 min-h-0 overflow-y-auto p-2">
               <QuickTapGrid products={products} onProductsUpdated={() => getAllProducts().then(setProducts)} />
             </div>
-          )}
-        </div>
+          </div>
+        )}
 
         {/* Checkout Modal */}
         {checkoutOpen && (

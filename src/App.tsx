@@ -141,7 +141,7 @@ function MainApp() {
   };
 
   const app = (
-    <div className="min-h-dvh bg-slate-100 flex flex-col relative">
+    <div className="h-dvh bg-slate-100 flex flex-col relative overflow-hidden">
       {/* Top Header Bar with Menu Button */}
       <header className="bg-white border-b border-slate-200 px-4 py-3 flex items-center justify-between sticky top-0 z-30 shadow-xs">
         <div className="flex items-center gap-3">
@@ -206,7 +206,7 @@ function MainApp() {
             {mode === 'dashboard' && <DashboardScreen />}
           </div>
         ) : (
-          <div className="flex-1 flex flex-col w-full bg-white">
+          <div className="flex-1 flex flex-col w-full bg-white min-h-0">
             {mode === 'cashier' && <CashierScreen />}
             {mode === 'history' && <TransactionHistoryScreen />}
             {mode === 'inventory' && <InventoryScreen />}
