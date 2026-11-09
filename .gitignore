@@ -53,3 +53,5 @@ web_modules/
 
 # Local scratch / audit working files (not part of the app)
 scratch/
+
+.vercel

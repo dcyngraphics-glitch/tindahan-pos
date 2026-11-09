@@ -21,6 +21,10 @@ jobs:
       - name: Install dependencies
         run: npm ci
       - name: Build
+        env:
+          # GitHub Pages serves the app from a subpath; Vercel serves it from the
+          # domain root and needs no override (see vite.config.ts).
+          VITE_BASE: /tindahan-pos/
         run: npm run build
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3

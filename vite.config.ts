@@ -3,8 +3,13 @@ import tailwindcss from '@tailwindcss/vite'
 import { defineConfig } from 'vite'
 import { VitePWA } from 'vite-plugin-pwa'
 
-// GitHub Pages deployment: serve from /tindahan-pos/ subpath
+// The app is served from the domain root on Vercel and from a subpath on GitHub
+// Pages, so the base has to be decided per platform at build time. VITE_BASE is
+// set in the GitHub Actions workflow; Vercel builds without it and gets '/'.
+const base = process.env.VITE_BASE || '/'
+
 export default defineConfig({
+  base,
   plugins: [
     react(),
     tailwindcss(),
@@ -15,7 +20,8 @@ export default defineConfig({
         name: 'Tindahan POS',
         short_name: 'Tindahan',
         description: 'Barcode scanner POS for small stores',
-        start_url: '/tindahan-pos/',
+        start_url: base,
+        scope: base,
         display: 'standalone',
         background_color: '#f8fafc',
         theme_color: '#f59e0b',
@@ -29,5 +35,4 @@ export default defineConfig({
       },
     }),
   ],
-  base: '/tindahan-pos/',
 })
