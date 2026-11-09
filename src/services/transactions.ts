@@ -67,8 +67,10 @@ export async function getTransactionsByDate(date: Date): Promise<Transaction[]> 
 export async function createTransaction(
   items: TransactionItem[],
   cashTendered: number,
-  discount?: { type: 'percent' | 'fixed'; value: number } | null
+  discount?: { type: 'percent' | 'fixed'; value: number } | null,
+  opts?: { paymentType?: 'cash' | 'utang' }
 ): Promise<string> {
+  const paymentType = opts?.paymentType ?? 'cash';
   let total = items.reduce((sum, item) => sum + item.price * item.quantity, 0);
   let effectiveTotal = total;
 
@@ -81,13 +83,15 @@ export async function createTransaction(
     }
   }
 
-  if (cashTendered < effectiveTotal) {
+  // A credit sale has no cash changing hands, so the tendered check only
+  // applies to cash sales.
+  if (paymentType === 'cash' && cashTendered < effectiveTotal) {
     throw new Error(
       `Cash tendered ($${cashTendered.toFixed(2)}) is less than effective total ($${effectiveTotal.toFixed(2)})`
     );
   }
 
-  const change = cashTendered - effectiveTotal;
+  const change = paymentType === 'utang' ? 0 : cashTendered - effectiveTotal;
   const id = generateId();
   const now = new Date();
 
@@ -144,6 +148,7 @@ export async function createTransaction(
       cashTendered,
       change,
       createdAt: now,
+      paymentType,
       ...(discount ? { discount } : {}),
     });
   });
@@ -152,10 +157,23 @@ export async function createTransaction(
 }
 
 export async function voidTransaction(id: string): Promise<void> {
-  await db.transaction('rw', db.transactions, db.products, async () => {
+  await db.transaction('rw', db.transactions, db.products, db.utang, db.utang_payments, async () => {
     const tx = await db.transactions.get(id);
     if (!tx) throw new Error('Transaction not found');
     if (tx.voided) throw new Error('Transaction is already voided');
+
+    // A credit sale that has already been paid against must be refunded first:
+    // deleting the debt while money has been collected would lose that record.
+    if (tx.paymentType === 'utang') {
+      const debt = await db.utang.where('transactionId').equals(id).first();
+      if (debt) {
+        const payments = await db.utang_payments.where('utangId').equals(debt.id).toArray();
+        if (payments.length > 0) {
+          throw new Error('This utang already has payments recorded. Delete those payments first, then void the sale.');
+        }
+        await db.utang.delete(debt.id);
+      }
+    }
 
     // Restore stock for all items
     for (const item of tx.items) {

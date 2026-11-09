@@ -1,8 +1,8 @@
 import { create } from 'zustand';
 
-export type AppMode = 'inventory' | 'cashier' | 'dashboard' | 'scanner' | 'history';
+export type AppMode = 'inventory' | 'cashier' | 'dashboard' | 'scanner' | 'history' | 'utang';
 
-const MODES: AppMode[] = ['inventory', 'cashier', 'dashboard', 'scanner', 'history'];
+const MODES: AppMode[] = ['inventory', 'cashier', 'dashboard', 'scanner', 'history', 'utang'];
 
 interface AppState {
   mode: AppMode;
@@ -34,7 +34,7 @@ function loadMode(): AppMode {
   if (fromUrl) return fromUrl;
   try {
     const saved = window.localStorage.getItem('tindahan_app_mode');
-    if (saved === 'inventory' || saved === 'cashier' || saved === 'dashboard' || saved === 'scanner' || saved === 'history') {
+    if (saved === 'inventory' || saved === 'cashier' || saved === 'dashboard' || saved === 'scanner' || saved === 'history' || saved === 'utang') {
       return saved;
     }
   } catch {

@@ -12,6 +12,7 @@ import { InventoryScreen } from './screens/InventoryScreen';
 import { DashboardScreen } from './screens/DashboardScreen';
 import { ScannerScreen } from './screens/ScannerScreen';
 import { TransactionHistoryScreen } from './screens/TransactionHistoryScreen';
+import { UtangScreen } from './screens/UtangScreen';
 import { CustomerDisplay } from './screens/CustomerDisplayScreen';
 import { LoginScreen } from './components/LoginScreen';
 import { seedCatalogIfEmpty, E2E_MODE } from './services/db';
@@ -208,6 +209,7 @@ function MainApp() {
         ) : (
           <div className="flex-1 flex flex-col w-full bg-white min-h-0">
             {mode === 'cashier' && <CashierScreen />}
+            {mode === 'utang' && <UtangScreen />}
             {mode === 'history' && <TransactionHistoryScreen />}
             {mode === 'inventory' && <InventoryScreen />}
             {mode === 'dashboard' && <DashboardScreen />}

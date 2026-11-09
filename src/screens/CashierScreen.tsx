@@ -9,7 +9,10 @@ import { useScannerDetection } from '../hooks/useScannerDetection';
 import { useBluetoothStatus } from '../hooks/useBluetoothStatus';
 import { useIsAtLeast } from '../hooks/useResponsive';
 import { printViaBluetooth } from '../services/printer';
-import { formatPeso, seedCatalogIfEmpty, SARI_SARI_SEED, type TransactionItem, type Product } from '../services/db';
+import { formatPeso, seedCatalogIfEmpty, SARI_SARI_SEED, type TransactionItem, type Product, type Customer } from '../services/db';
+import { getAllCustomers, addCustomer } from '../services/customers';
+import { createUtang } from '../services/utang';
+import { useCloudSession } from '../hooks/useCloudSession';
 
 // React Compiler false positive: this only runs from event handlers, never during render.
 const receiptDate = () => new Date();
@@ -23,7 +26,7 @@ export function CashierScreen() {
 
   const [checkoutOpen, setCheckoutOpen] = useState(false);
   const [cashTendered, setCashTendered] = useState('');
-  const [receipt, setReceipt] = useState<{ id: string; items: TransactionItem[]; total: number; change: number; cashTendered: number } | null>(null);
+  const [receipt, setReceipt] = useState<{ id: string; items: TransactionItem[]; total: number; change: number; cashTendered: number; paymentType: 'cash' | 'utang' } | null>(null);
   const [notFound, setNotFound] = useState<string | null>(null);
   // When a scanned barcode is not in the store's catalogue but IS in the reference
   // catalogue, the form opens pre-filled so the cashier only adjusts price and stock.
@@ -36,7 +39,19 @@ export function CashierScreen() {
   const [discountType, setDiscountType] = useState<'percent' | 'fixed'>('percent');
   const [discountValue, setDiscountValue] = useState('');
 
+  // Credit (utang) checkout state
+  const { email: accountEmail } = useCloudSession();
+  const [paymentType, setPaymentType] = useState<'cash' | 'utang'>('cash');
+  const [customers, setCustomers] = useState<Customer[]>([]);
+  const [customerSearch, setCustomerSearch] = useState('');
+  const [selectedCustomerId, setSelectedCustomerId] = useState<string | null>(null);
+  const [newCustomerName, setNewCustomerName] = useState('');
+  const [newCustomerPhone, setNewCustomerPhone] = useState('');
+  const [showNewCustomer, setShowNewCustomer] = useState(false);
+  const [checkoutError, setCheckoutError] = useState('');
+
   const total = getDiscountedTotal();
+  const selectedCustomer = customers.find(c => c.id === selectedCustomerId) ?? null;
 
   // Load products for quick-tap grid
   useEffect(() => {
@@ -45,6 +60,37 @@ export function CashierScreen() {
       .then(setProducts)
       .catch(err => console.error('Failed to load products:', err));
   }, []);
+
+  // Customers are only needed for credit sales, so load them when checkout opens.
+  useEffect(() => {
+    if (!checkoutOpen) return;
+    getAllCustomers()
+      .then(setCustomers)
+      .catch(err => console.error('Failed to load customers:', err));
+  }, [checkoutOpen]);
+
+  const matchingCustomers = useCallback(() => {
+    const q = customerSearch.trim().toLowerCase();
+    const sorted = [...customers].sort((a, b) => a.name.localeCompare(b.name));
+    if (!q) return sorted;
+    return sorted.filter(c => `${c.name} ${c.phone ?? ''}`.toLowerCase().includes(q));
+  }, [customers, customerSearch]);
+
+  const chooseCustomer = async (data: { name: string; phone?: string }) => {
+    // Adding a customer inline from the till should not lose the sale in progress.
+    try {
+      const id = await addCustomer(data);
+      const all = await getAllCustomers();
+      setCustomers(all);
+      setSelectedCustomerId(id);
+      setShowNewCustomer(false);
+      setNewCustomerName('');
+      setNewCustomerPhone('');
+      setCheckoutError('');
+    } catch (err: any) {
+      setCheckoutError(err?.message || 'Could not add the customer.');
+    }
+  };
 
   /**
    * Discounts are clamped so a sale can never reach ₱0.00 by typing 100% (or a
@@ -162,15 +208,21 @@ export function CashierScreen() {
   // Wire up global barcode scanner listener to handleScan
   useBarcodeScannerListener(handleScan);
 
+  const resetCheckout = () => {
+    setCheckoutOpen(false);
+    setCashTendered('');
+    setPaymentType('cash');
+    setCustomerSearch('');
+    setSelectedCustomerId(null);
+    setNewCustomerName('');
+    setNewCustomerPhone('');
+    setShowNewCustomer(false);
+    setCheckoutError('');
+  };
+
   const handleCheckout = async () => {
     if (items.length === 0) {
       showToast('Add items to checkout first.');
-      return;
-    }
-    const cash = parseFloat(cashTendered);
-    const cashCents = Math.round(cash * 100);
-    if (isNaN(cash) || cashCents < total) {
-      showToast('Insufficient cash');
       return;
     }
     // A zero-total sale is never a real sale; block it rather than silently
@@ -180,32 +232,61 @@ export function CashierScreen() {
       return;
     }
 
+    const cash = parseFloat(cashTendered);
+    const cashCents = Math.round(cash * 100);
+
+    if (paymentType === 'cash') {
+      if (isNaN(cash) || cashCents < total) {
+        showToast('Insufficient cash');
+        return;
+      }
+    } else if (!selectedCustomerId) {
+      // A credit sale without a customer would leave the debt unattributed.
+      setCheckoutError('Choose a customer, or add a new one.');
+      return;
+    }
+
+    setCheckoutError('');
+
     try {
+      const transactionItems = items.map(i => ({
+        productId: i.productId,
+        barcode: i.barcode,
+        name: i.name,
+        price: i.price,
+        quantity: i.quantity,
+      }));
+
       const transactionId = await createTransaction(
-        items.map(i => ({
-          productId: i.productId,
-          barcode: i.barcode,
-          name: i.name,
-          price: i.price,
-          quantity: i.quantity,
-        })),
-        Math.round(cash * 100),
-        discount
+        transactionItems,
+        paymentType === 'cash' ? cashCents : 0,
+        discount,
+        { paymentType }
       );
+
+      if (paymentType === 'utang') {
+        await createUtang({
+          customerId: selectedCustomerId!,
+          transactionId,
+          items: transactionItems,
+          total,
+          createdBy: accountEmail ?? 'unknown',
+        });
+      }
 
       const completedReceipt = {
         id: transactionId,
         items: [...items],
         total,
-        cashTendered: Math.round(cash * 100),
-        change: Math.round(cash * 100) - total,
+        cashTendered: paymentType === 'cash' ? cashCents : 0,
+        change: paymentType === 'cash' ? cashCents - total : 0,
+        paymentType,
       };
 
       setReceipt(completedReceipt);
       clearCart(); // also clears store discount
       setDiscountValue('');
-      setCheckoutOpen(false);
-      setCashTendered('');
+      resetCheckout();
 
       // Auto-print on Bluetooth printer after checkout
       if (printerConnected) {
@@ -459,6 +540,28 @@ export function CashierScreen() {
                 {discount && <p className="text-4xl font-extrabold text-amber-600">{formatPeso(total)}</p>}
               </div>
 
+              {/* Payment type: cash now, or on credit (utang) */}
+              <div>
+                <label className="block text-xs font-bold text-slate-600 uppercase mb-2">Payment</label>
+                <div className="flex gap-2">
+                  {(['cash', 'utang'] as const).map(pt => (
+                    <button
+                      key={pt}
+                      type="button"
+                      onClick={() => {
+                        setPaymentType(pt);
+                        setCheckoutError('');
+                      }}
+                      className={`flex-1 py-3 rounded-xl font-bold text-sm min-h-[44px] ${
+                        paymentType === pt ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-600'
+                      }`}
+                    >
+                      {pt === 'cash' ? '💵 Cash' : '📒 Utang'}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
               {/* Discount row */}
               <div>
                 <label className="block text-xs font-bold text-slate-600 uppercase mb-2">Discount (optional)</label>
@@ -487,60 +590,158 @@ export function CashierScreen() {
                 </div>
               </div>
 
-              <div>
-                <label className="block text-xs font-bold text-slate-600 uppercase mb-2">Cash Tendered (PHP)</label>
-                <div className="relative mb-2">
-                  <span className="absolute left-4 top-3.5 text-xl font-bold text-slate-400">₱</span>
-                  <input
-                    type="number"
-                    value={cashTendered}
-                    onChange={e => setCashTendered(e.target.value)}
-                    onKeyDown={e => {
-                      if (e.key === 'Enter' && cashTendered && Math.round(parseFloat(cashTendered) * 100) >= total) {
-                        handleCheckout();
-                      }
-                    }}
-                    placeholder="0.00"
-                    className="w-full pl-10 pr-4 py-3 rounded-2xl border-2 border-slate-200 text-2xl font-bold focus:outline-none focus:border-amber-500"
-                    autoFocus
-                  />
-                </div>
-                <div className="flex gap-1.5 flex-wrap">
-                  {[20, 50, 100, 200, 500, 1000].map(amt => (
-                    <button
-                      key={amt}
-                      type="button"
-                      onClick={() => setCashTendered(amt.toString())}
-                      className="min-h-[44px] px-4 py-2.5 bg-slate-100 hover:bg-amber-100 hover:text-amber-800 text-slate-700 font-bold text-sm rounded-xl border border-slate-200 transition-colors"
-                    >
-                      ₱{amt}
-                    </button>
-                  ))}
-                  <button
-                    type="button"
-                    onClick={() => setCashTendered((total / 100).toFixed(2))}
-                    className="min-h-[44px] px-4 py-2.5 bg-amber-50 hover:bg-amber-100 text-amber-800 font-bold text-sm rounded-xl border border-amber-200 transition-colors"
-                  >
-                    Exact
-                  </button>
-                </div>
-              </div>
+              {paymentType === 'cash' ? (
+                <>
+                  <div>
+                    <label className="block text-xs font-bold text-slate-600 uppercase mb-2">Cash Tendered (PHP)</label>
+                    <div className="relative mb-2">
+                      <span className="absolute left-4 top-3.5 text-xl font-bold text-slate-400">₱</span>
+                      <input
+                        type="number"
+                        value={cashTendered}
+                        onChange={e => setCashTendered(e.target.value)}
+                        onKeyDown={e => {
+                          if (e.key === 'Enter' && cashTendered && Math.round(parseFloat(cashTendered) * 100) >= total) {
+                            handleCheckout();
+                          }
+                        }}
+                        placeholder="0.00"
+                        className="w-full pl-10 pr-4 py-3 rounded-2xl border-2 border-slate-200 text-2xl font-bold focus:outline-none focus:border-amber-500"
+                        autoFocus
+                      />
+                    </div>
+                    <div className="flex gap-1.5 flex-wrap">
+                      {[20, 50, 100, 200, 500, 1000].map(amt => (
+                        <button
+                          key={amt}
+                          type="button"
+                          onClick={() => setCashTendered(amt.toString())}
+                          className="min-h-[44px] px-4 py-2.5 bg-slate-100 hover:bg-amber-100 hover:text-amber-800 text-slate-700 font-bold text-sm rounded-xl border border-slate-200 transition-colors"
+                        >
+                          ₱{amt}
+                        </button>
+                      ))}
+                      <button
+                        type="button"
+                        onClick={() => setCashTendered((total / 100).toFixed(2))}
+                        className="min-h-[44px] px-4 py-2.5 bg-amber-50 hover:bg-amber-100 text-amber-800 font-bold text-sm rounded-xl border border-amber-200 transition-colors"
+                      >
+                        Exact
+                      </button>
+                    </div>
+                  </div>
 
-              {cashTendered && !isNaN(parseFloat(cashTendered)) && (
-                <div className="bg-slate-50 p-4 rounded-2xl flex justify-between items-center">
-                  <span className="font-bold text-slate-600">Change</span>
-                  <span className={`text-2xl font-black ${Math.round(parseFloat(cashTendered) * 100) >= total ? 'text-green-600' : 'text-red-700'}`}>
-                    {Math.round(parseFloat(cashTendered) * 100) >= total ? formatPeso(Math.round(parseFloat(cashTendered) * 100) - total) : 'Insufficient Cash'}
-                  </span>
+                  {cashTendered && !isNaN(parseFloat(cashTendered)) && (
+                    <div className="bg-slate-50 p-4 rounded-2xl flex justify-between items-center">
+                      <span className="font-bold text-slate-600">Change</span>
+                      <span className={`text-2xl font-black ${Math.round(parseFloat(cashTendered) * 100) >= total ? 'text-green-600' : 'text-red-700'}`}>
+                        {Math.round(parseFloat(cashTendered) * 100) >= total ? formatPeso(Math.round(parseFloat(cashTendered) * 100) - total) : 'Insufficient Cash'}
+                      </span>
+                    </div>
+                  )}
+                </>
+              ) : (
+                <div>
+                  <label className="block text-xs font-bold text-slate-600 uppercase mb-2">Customer</label>
+                  {selectedCustomer ? (
+                    <div className="flex items-center justify-between gap-3 bg-amber-50 border border-amber-200 rounded-xl p-4">
+                      <div className="min-w-0">
+                        <p className="font-bold text-slate-900 truncate">{selectedCustomer.name}</p>
+                        {selectedCustomer.phone && (
+                          <p className="text-xs text-slate-500">📞 {selectedCustomer.phone}</p>
+                        )}
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setSelectedCustomerId(null)}
+                        className="shrink-0 px-3 py-2 rounded-lg bg-white text-slate-700 text-xs font-bold min-h-[44px]"
+                      >
+                        Change
+                      </button>
+                    </div>
+                  ) : (
+                    <>
+                      <input
+                        type="text"
+                        value={customerSearch}
+                        onChange={e => setCustomerSearch(e.target.value)}
+                        placeholder="Search customers"
+                        className="w-full px-4 py-3 rounded-xl border-2 border-slate-200 text-sm focus:outline-none focus:border-amber-500"
+                      />
+                      <div className="max-h-44 overflow-y-auto space-y-1.5 mt-2">
+                        {matchingCustomers().map(c => (
+                          <button
+                            key={c.id}
+                            type="button"
+                            onClick={() => {
+                              setSelectedCustomerId(c.id);
+                              setCheckoutError('');
+                            }}
+                            className="w-full text-left px-4 py-3 rounded-xl bg-slate-100 hover:bg-amber-100 min-h-[44px]"
+                          >
+                            <p className="font-bold text-slate-900 text-sm">{c.name}</p>
+                            {c.phone && <p className="text-xs text-slate-500">{c.phone}</p>}
+                          </button>
+                        ))}
+                        {matchingCustomers().length === 0 && (
+                          <p className="text-sm text-slate-400 text-center py-3">No customers found.</p>
+                        )}
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setShowNewCustomer(v => !v)}
+                        className="mt-3 w-full py-3 rounded-xl border-2 border-dashed border-slate-300 text-slate-600 font-bold text-sm min-h-[44px]"
+                      >
+                        + New Customer
+                      </button>
+                      {showNewCustomer && (
+                        <div className="mt-3 space-y-2">
+                          <input
+                            type="text"
+                            value={newCustomerName}
+                            onChange={e => setNewCustomerName(e.target.value)}
+                            placeholder="Customer name"
+                            className="w-full px-4 py-3 rounded-xl border-2 border-slate-200 text-sm focus:outline-none focus:border-amber-500"
+                          />
+                          <input
+                            type="text"
+                            value={newCustomerPhone}
+                            onChange={e => setNewCustomerPhone(e.target.value)}
+                            placeholder="Phone (optional)"
+                            className="w-full px-4 py-3 rounded-xl border-2 border-slate-200 text-sm focus:outline-none focus:border-amber-500"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => chooseCustomer({ name: newCustomerName, phone: newCustomerPhone })}
+                            disabled={!newCustomerName.trim()}
+                            className="w-full py-3 rounded-xl bg-slate-900 text-white font-bold text-sm disabled:opacity-40 min-h-[44px]"
+                          >
+                            Add & Select
+                          </button>
+                        </div>
+                      )}
+                    </>
+                  )}
+                  <p className="text-xs text-slate-500 mt-3">
+                    This sale is added to the customer's balance. No cash is collected.
+                  </p>
                 </div>
               )}
 
+              {checkoutError && (
+                <p className="text-sm text-red-600 bg-red-50 rounded-xl p-3">{checkoutError}</p>
+              )}
+              
               <button
                 onClick={handleCheckout}
-                disabled={!cashTendered || Math.round(parseFloat(cashTendered) * 100) < total}
+                disabled={
+                  paymentType === 'cash'
+                    ? !cashTendered || Math.round(parseFloat(cashTendered) * 100) < total
+                    : !selectedCustomerId
+                }
                 className="w-full py-4 bg-amber-500 hover:bg-amber-600 text-slate-900 font-extrabold text-lg rounded-2xl shadow-lg disabled:opacity-40 transition"
               >
-                Complete Payment
+                {paymentType === 'cash' ? 'Complete Payment' : 'Record Utang'}
               </button>
             </div>
           </div>
@@ -554,6 +755,11 @@ export function CashierScreen() {
                 <p className="text-4xl mb-2">🎉</p>
                 <h3 className="text-2xl font-black text-slate-900">Transaction Complete!</h3>
                 <p className="text-xs text-slate-400">Receipt #{receipt.id.slice(0, 8)}</p>
+                {receipt.paymentType === 'utang' && (
+                  <p className="mt-2 inline-block px-3 py-1 rounded-full bg-amber-100 text-amber-800 text-xs font-black">
+                    📒 UTANG — {formatPeso(receipt.total)} ON RECORD
+                  </p>
+                )}
               </div>
 
               <div className="space-y-2 max-h-48 overflow-y-auto text-sm">
@@ -570,14 +776,23 @@ export function CashierScreen() {
                   <span>Total</span>
                   <span>{formatPeso(receipt.total)}</span>
                 </div>
-                <div className="flex justify-between text-slate-500">
-                  <span>Cash Tendered</span>
-                  <span>{formatPeso(receipt.cashTendered)}</span>
-                </div>
-                <div className="flex justify-between text-green-600 font-bold">
-                  <span>Change</span>
-                  <span>{formatPeso(receipt.change)}</span>
-                </div>
+                {receipt.paymentType === 'utang' ? (
+                  <div className="flex justify-between text-amber-700 font-bold">
+                    <span>Balance on record</span>
+                    <span>{formatPeso(receipt.total)}</span>
+                  </div>
+                ) : (
+                  <>
+                    <div className="flex justify-between text-slate-500">
+                      <span>Cash Tendered</span>
+                      <span>{formatPeso(receipt.cashTendered)}</span>
+                    </div>
+                    <div className="flex justify-between text-green-600 font-bold">
+                      <span>Change</span>
+                      <span>{formatPeso(receipt.change)}</span>
+                    </div>
+                  </>
+                )}
               </div>
               <div className="space-y-2">
                 <button
@@ -775,6 +990,28 @@ export function CashierScreen() {
               {discount && <p className="text-4xl font-extrabold text-amber-600">{formatPeso(total)}</p>}
             </div>
 
+            {/* Payment type: cash now, or on credit (utang) */}
+            <div>
+              <label className="block text-xs font-bold text-slate-600 uppercase mb-2">Payment</label>
+              <div className="flex gap-2">
+                {(['cash', 'utang'] as const).map(pt => (
+                  <button
+                    key={pt}
+                    type="button"
+                    onClick={() => {
+                      setPaymentType(pt);
+                      setCheckoutError('');
+                    }}
+                    className={`flex-1 py-3 rounded-xl font-bold text-sm min-h-[44px] ${
+                      paymentType === pt ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-600'
+                    }`}
+                  >
+                    {pt === 'cash' ? '💵 Cash' : '📒 Utang'}
+                  </button>
+                ))}
+              </div>
+            </div>
+
             {/* Discount row */}
             <div>
               <label className="block text-xs font-bold text-slate-600 uppercase mb-2">Discount (optional)</label>
@@ -803,37 +1040,135 @@ export function CashierScreen() {
               </div>
             </div>
 
-            <div>
-              <label className="block text-xs font-bold text-slate-600 uppercase mb-2">Cash Tendered (PHP)</label>
-              <div className="relative">
-                <span className="absolute left-4 top-3.5 text-xl font-bold text-slate-400">₱</span>
-                <input
-                  type="number"
-                  value={cashTendered}
-                  onChange={e => setCashTendered(e.target.value)}
-                  placeholder="0.00"
-                  className="w-full pl-10 pr-4 py-3 rounded-2xl border-2 border-slate-200 text-2xl font-bold focus:outline-none focus:border-amber-500"
-                  autoFocus
-                />
-              </div>
-            </div>
+            {paymentType === 'cash' ? (
+              <>
+                <div>
+                  <label className="block text-xs font-bold text-slate-600 uppercase mb-2">Cash Tendered (PHP)</label>
+                  <div className="relative">
+                    <span className="absolute left-4 top-3.5 text-xl font-bold text-slate-400">₱</span>
+                    <input
+                      type="number"
+                      value={cashTendered}
+                      onChange={e => setCashTendered(e.target.value)}
+                      placeholder="0.00"
+                      className="w-full pl-10 pr-4 py-3 rounded-2xl border-2 border-slate-200 text-2xl font-bold focus:outline-none focus:border-amber-500"
+                      autoFocus
+                    />
+                  </div>
+                </div>
 
-            {cashTendered && !isNaN(parseFloat(cashTendered)) && (
-              <div className="bg-slate-50 p-4 rounded-2xl flex justify-between items-center">
-                <span className="font-bold text-slate-600">Change</span>
-                <span className={`text-2xl font-black ${Math.round(parseFloat(cashTendered) * 100) >= total ? 'text-green-600' : 'text-red-700'}`}>
-                  {Math.round(parseFloat(cashTendered) * 100) >= total ? formatPeso(Math.round(parseFloat(cashTendered) * 100) - total) : 'Insufficient Cash'}
-                </span>
+                {cashTendered && !isNaN(parseFloat(cashTendered)) && (
+                  <div className="bg-slate-50 p-4 rounded-2xl flex justify-between items-center">
+                    <span className="font-bold text-slate-600">Change</span>
+                    <span className={`text-2xl font-black ${Math.round(parseFloat(cashTendered) * 100) >= total ? 'text-green-600' : 'text-red-700'}`}>
+                      {Math.round(parseFloat(cashTendered) * 100) >= total ? formatPeso(Math.round(parseFloat(cashTendered) * 100) - total) : 'Insufficient Cash'}
+                    </span>
+                  </div>
+                )}
+              </>
+            ) : (
+              <div>
+                <label className="block text-xs font-bold text-slate-600 uppercase mb-2">Customer</label>
+                {selectedCustomer ? (
+                  <div className="flex items-center justify-between gap-3 bg-amber-50 border border-amber-200 rounded-xl p-4">
+                    <div className="min-w-0">
+                      <p className="font-bold text-slate-900 truncate">{selectedCustomer.name}</p>
+                      {selectedCustomer.phone && (
+                        <p className="text-xs text-slate-500">📞 {selectedCustomer.phone}</p>
+                      )}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setSelectedCustomerId(null)}
+                      className="shrink-0 px-3 py-2 rounded-lg bg-white text-slate-700 text-xs font-bold min-h-[44px]"
+                    >
+                      Change
+                    </button>
+                  </div>
+                ) : (
+                  <>
+                    <input
+                      type="text"
+                      value={customerSearch}
+                      onChange={e => setCustomerSearch(e.target.value)}
+                      placeholder="Search customers"
+                      className="w-full px-4 py-3 rounded-xl border-2 border-slate-200 text-sm focus:outline-none focus:border-amber-500"
+                    />
+                    <div className="max-h-44 overflow-y-auto space-y-1.5 mt-2">
+                      {matchingCustomers().map(c => (
+                        <button
+                          key={c.id}
+                          type="button"
+                          onClick={() => {
+                            setSelectedCustomerId(c.id);
+                            setCheckoutError('');
+                          }}
+                          className="w-full text-left px-4 py-3 rounded-xl bg-slate-100 hover:bg-amber-100 min-h-[44px]"
+                        >
+                          <p className="font-bold text-slate-900 text-sm">{c.name}</p>
+                          {c.phone && <p className="text-xs text-slate-500">{c.phone}</p>}
+                        </button>
+                      ))}
+                      {matchingCustomers().length === 0 && (
+                        <p className="text-sm text-slate-400 text-center py-3">No customers found.</p>
+                      )}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setShowNewCustomer(v => !v)}
+                      className="mt-3 w-full py-3 rounded-xl border-2 border-dashed border-slate-300 text-slate-600 font-bold text-sm min-h-[44px]"
+                    >
+                      + New Customer
+                    </button>
+                    {showNewCustomer && (
+                      <div className="mt-3 space-y-2">
+                        <input
+                          type="text"
+                          value={newCustomerName}
+                          onChange={e => setNewCustomerName(e.target.value)}
+                          placeholder="Customer name"
+                          className="w-full px-4 py-3 rounded-xl border-2 border-slate-200 text-sm focus:outline-none focus:border-amber-500"
+                        />
+                        <input
+                          type="text"
+                          value={newCustomerPhone}
+                          onChange={e => setNewCustomerPhone(e.target.value)}
+                          placeholder="Phone (optional)"
+                          className="w-full px-4 py-3 rounded-xl border-2 border-slate-200 text-sm focus:outline-none focus:border-amber-500"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => chooseCustomer({ name: newCustomerName, phone: newCustomerPhone })}
+                          disabled={!newCustomerName.trim()}
+                          className="w-full py-3 rounded-xl bg-slate-900 text-white font-bold text-sm disabled:opacity-40 min-h-[44px]"
+                        >
+                          Add & Select
+                        </button>
+                      </div>
+                    )}
+                  </>
+                )}
+                <p className="text-xs text-slate-500 mt-3">
+                  This sale is added to the customer's balance. No cash is collected.
+                </p>
               </div>
             )}
 
+            {checkoutError && (
+              <p className="text-sm text-red-600 bg-red-50 rounded-xl p-3">{checkoutError}</p>
+            )}
+            
             <button
               onClick={handleCheckout}
-              disabled={!cashTendered || Math.round(parseFloat(cashTendered) * 100) < total}
+              disabled={
+                paymentType === 'cash'
+                  ? !cashTendered || Math.round(parseFloat(cashTendered) * 100) < total
+                  : !selectedCustomerId
+              }
               className="w-full py-4 bg-amber-500 hover:bg-amber-600 text-slate-900 font-extrabold text-lg rounded-2xl shadow-lg disabled:opacity-40 transition"
-              >
-              Complete Payment
-              </button>
+            >
+              {paymentType === 'cash' ? 'Complete Payment' : 'Record Utang'}
+            </button>
           </div>
         </div>
       )}
@@ -846,6 +1181,11 @@ export function CashierScreen() {
               <p className="text-4xl mb-2">🎉</p>
               <h3 className="text-2xl font-black text-slate-900">Transaction Complete!</h3>
               <p className="text-xs text-slate-400">Receipt #{receipt.id.slice(0, 8)}</p>
+              {receipt.paymentType === 'utang' && (
+                <p className="mt-2 inline-block px-3 py-1 rounded-full bg-amber-100 text-amber-800 text-xs font-black">
+                  📒 UTANG — {formatPeso(receipt.total)} ON RECORD
+                </p>
+              )}
             </div>
 
             <div className="space-y-2 max-h-48 overflow-y-auto text-sm">
@@ -862,14 +1202,23 @@ export function CashierScreen() {
                 <span>Total</span>
                 <span>{formatPeso(receipt.total)}</span>
               </div>
-              <div className="flex justify-between text-slate-500">
-                <span>Cash Tendered</span>
-                <span>{formatPeso(receipt.cashTendered)}</span>
-              </div>
-              <div className="flex justify-between text-green-600 font-bold">
-                <span>Change</span>
-                <span>{formatPeso(receipt.change)}</span>
-              </div>
+              {receipt.paymentType === 'utang' ? (
+                <div className="flex justify-between text-amber-700 font-bold">
+                  <span>Balance on record</span>
+                  <span>{formatPeso(receipt.total)}</span>
+                </div>
+              ) : (
+                <>
+                  <div className="flex justify-between text-slate-500">
+                    <span>Cash Tendered</span>
+                    <span>{formatPeso(receipt.cashTendered)}</span>
+                  </div>
+                  <div className="flex justify-between text-green-600 font-bold">
+                    <span>Change</span>
+                    <span>{formatPeso(receipt.change)}</span>
+                  </div>
+                </>
+              )}
             </div>
             <div className="space-y-2">
               <button

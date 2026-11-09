@@ -2,6 +2,7 @@ import { useEffect, useState, useCallback, useMemo } from 'react';
 import { getAllTransactions } from '../services/transactions';
 import { getAllProducts } from '../services/products';
 import { formatPeso, type Transaction, type Product } from '../services/db';
+import { getOutstandingTotal } from '../services/utang';
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid, AreaChart, Area } from 'recharts';
 
 export function DashboardScreen() {
@@ -11,6 +12,7 @@ export function DashboardScreen() {
   const [refreshKey, setRefreshKey] = useState(0);
   const [dateRange, setDateRange] = useState<'today' | '7d' | '30d' | 'all'>('all');
   const [topSortBy, setTopSortBy] = useState<'qty' | 'rev'>('qty');
+  const [outstandingUtang, setOutstandingUtang] = useState(0);
   // 'Today' is a moving target: captured once at mount, the dashboard kept
   // showing yesterday's range if the app was left open overnight.
   const [now, setNow] = useState(() => new Date());
@@ -32,6 +34,7 @@ export function DashboardScreen() {
       const prods = await getAllProducts();
       setTransactions(txs);
       setProducts(prods);
+      setOutstandingUtang(await getOutstandingTotal());
     } catch (err) {
       console.error(err);
     } finally {
@@ -219,7 +222,7 @@ export function DashboardScreen() {
         </div>
 
         {/* Stat Cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
           <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs">
             <p className="text-xs font-medium text-slate-500 uppercase tracking-wider">Total Revenue</p>
             <p className="text-3xl font-extrabold text-emerald-600 mt-1">{formatPeso(totalRevenue)}</p>
@@ -243,6 +246,13 @@ export function DashboardScreen() {
               {lowStockProducts.length}
             </p>
             <p className="text-xs text-slate-500 mt-1">Products with ≤ 5 units</p>
+          </div>
+          <div className="bg-white p-5 rounded-2xl border border-amber-200 shadow-xs">
+            <p className="text-xs font-medium text-amber-700 uppercase tracking-wider">Outstanding Utang</p>
+            <p className={`text-3xl font-extrabold mt-1 ${outstandingUtang > 0 ? 'text-amber-600' : 'text-slate-900'}`}>
+              {formatPeso(outstandingUtang)}
+            </p>
+            <p className="text-xs text-slate-500 mt-1">Sold on credit, not yet collected</p>
           </div>
         </div>
 

@@ -32,6 +32,40 @@ export interface Transaction {
   createdAt: Date;
   voided?: boolean;
   discount?: { type: 'percent' | 'fixed'; value: number } | null;
+  // Absent means a normal cash sale. 'utang' marks a sale recorded on credit,
+  // which also has a matching record in the `utang` table tracking the balance.
+  paymentType?: 'cash' | 'utang';
+}
+
+export interface Customer {
+  id: string;
+  name: string;
+  phone?: string;
+  note?: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface Utang {
+  id: string;
+  customerId: string;
+  // The sale this debt came from, so voiding the sale can find (and block on)
+  // the debt and its payments.
+  transactionId?: string;
+  items: TransactionItem[];
+  total: number; // in centavos (after discount)
+  createdBy: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface UtangPayment {
+  id: string;
+  utangId: string;
+  amount: number; // in centavos
+  note?: string;
+  createdBy: string;
+  createdAt: Date;
 }
 
 // --- Build-time sync config -------------------------------------------------
@@ -74,14 +108,37 @@ export const E2E_MODE =
 const db = new Dexie('TindahanPOS', { addons: [dexieCloud] }) as Dexie & {
   products: EntityTable<Product, 'id'>;
   transactions: EntityTable<Transaction, 'id'>;
+  customers: EntityTable<Customer, 'id'>;
+  utang: EntityTable<Utang, 'id'>;
+  utang_payments: EntityTable<UtangPayment, 'id'>;
 };
 
 // Declare the schema BEFORE configure(), the same order the working barcode-inventory
 // app uses. Dexie applies db.version().stores() to the instance either way, but keeping
-// the proven order means one less difference to reason about when debugging sync.
+// the proven order means one less difference to reason about when sync.
 db.version(1).stores({
   products: 'id, barcode, name, category, createdAt',
   transactions: 'id, createdAt',
+});
+
+// v2 adds the utang (credit) tables. Adding tables is additive, which Dexie Cloud
+// accepts on a live database; renaming or re-keying an existing table is not.
+db.version(2).stores({
+  products: 'id, barcode, name, category, createdAt',
+  transactions: 'id, createdAt',
+  customers: 'id, name, createdAt',
+  utang: 'id, customerId, createdAt',
+  utang_payments: 'id, utangId, createdAt',
+});
+
+// v3 indexes utang.transactionId so a sale can find its debt without scanning
+// the whole table.
+db.version(3).stores({
+  products: 'id, barcode, name, category, createdAt',
+  transactions: 'id, createdAt',
+  customers: 'id, name, createdAt',
+  utang: 'id, customerId, transactionId, createdAt',
+  utang_payments: 'id, utangId, createdAt',
 });
 
 try {

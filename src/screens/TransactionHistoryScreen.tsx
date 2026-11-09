@@ -165,6 +165,11 @@ export function TransactionHistoryScreen() {
                               Voided
                             </span>
                           )}
+                          {tx.paymentType === 'utang' && !tx.voided && (
+                            <span className="bg-amber-100 text-amber-800 text-xs font-black px-2 py-0.5 rounded-md uppercase tracking-wider">
+                              Utang
+                            </span>
+                          )}
                         </div>
                         <p className="text-xs text-slate-400">
                           {dateStr} · {tx.items.reduce((sum, i) => sum + i.quantity, 0)} items
@@ -212,8 +217,14 @@ export function TransactionHistoryScreen() {
                         ))}
                       </div>
                       <div className="border-t border-slate-200 pt-2 flex justify-between text-xs font-bold text-slate-600">
-                        <span>Tendered: {formatPeso(tx.cashTendered)}</span>
-                        <span>Change: {formatPeso(tx.change)}</span>
+                        {tx.paymentType === 'utang' ? (
+                          <span className="text-amber-700">📒 Sold on credit (utang)</span>
+                        ) : (
+                          <>
+                            <span>Tendered: {formatPeso(tx.cashTendered)}</span>
+                            <span>Change: {formatPeso(tx.change)}</span>
+                          </>
+                        )}
                       </div>
                       <p className="text-xs text-slate-500 pt-1 font-mono">
                         ID: {tx.id}

@@ -22,6 +22,7 @@ export function ModeNav({ isOpen, onClose, lowStockCount = 0 }: ModeNavProps) {
 
   const cashierModes: { id: AppMode; label: string; icon: string }[] = [
     { id: 'cashier', label: 'Cashier', icon: '💰' },
+    { id: 'utang', label: 'Utang', icon: '📒' },
     { id: 'scanner', label: 'Scanner', icon: '📷' },
     { id: 'history', label: 'History', icon: '🧾' },
     { id: 'inventory', label: 'Inventory', icon: '📦' },
