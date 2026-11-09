@@ -50,3 +50,6 @@ web_modules/
 .eslintcache
 .stylelintcache
 .node
+
+# Local scratch / audit working files (not part of the app)
+scratch/

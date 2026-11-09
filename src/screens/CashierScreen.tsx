@@ -9,7 +9,7 @@ import { useScannerDetection } from '../hooks/useScannerDetection';
 import { useBluetoothStatus } from '../hooks/useBluetoothStatus';
 import { useIsAtLeast } from '../hooks/useResponsive';
 import { printViaBluetooth } from '../services/printer';
-import { formatPeso, seedCatalogIfEmpty, type TransactionItem, type Product } from '../services/db';
+import { formatPeso, seedCatalogIfEmpty, SARI_SARI_SEED, type TransactionItem, type Product } from '../services/db';
 
 // React Compiler false positive: this only runs from event handlers, never during render.
 const receiptDate = () => new Date();
@@ -24,6 +24,9 @@ export function CashierScreen() {
   const [cashTendered, setCashTendered] = useState('');
   const [receipt, setReceipt] = useState<{ id: string; items: TransactionItem[]; total: number; change: number; cashTendered: number } | null>(null);
   const [notFound, setNotFound] = useState<string | null>(null);
+  // When a scanned barcode is not in the store's catalogue but IS in the reference
+  // catalogue, the form opens pre-filled so the cashier only adjusts price and stock.
+  const [seedPrefill, setSeedPrefill] = useState<Product | null>(null);
   const [printing, setPrinting] = useState(false);
   const [quickTapExpanded, setQuickTapExpanded] = useState(true);
   const [products, setProducts] = useState<Product[]>([]);
@@ -82,6 +85,7 @@ export function CashierScreen() {
         closeCheckout();
         setReceipt(null);
         setNotFound(null);
+        setSeedPrefill(null);
       }
     };
     window.addEventListener('keydown', handleKeyDown);
@@ -102,6 +106,7 @@ export function CashierScreen() {
 
   const handleScan = useCallback(async (barcode: string) => {
     setNotFound(null);
+    setSeedPrefill(null);
 
     const product = await getProductByBarcode(barcode);
     if (product) {
@@ -117,6 +122,22 @@ export function CashierScreen() {
         showToast('Product out of stock');
       }
     } else {
+      // Same pre-fill the Inventory and Scanner screens already do: match the
+      // scanned barcode against the reference catalogue and hand the details to
+      // the form, so the till does not make the cashier type a known product.
+      const seedItem = SARI_SARI_SEED.find(s => s.barcode === barcode);
+      setSeedPrefill(seedItem ? {
+        id: '',
+        barcode: seedItem.barcode,
+        name: seedItem.name,
+        price: seedItem.price,
+        cost: seedItem.cost,
+        stock: seedItem.stock || 50,
+        category: seedItem.category,
+        isQuickTap: seedItem.isQuickTap || false,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      } : null);
       setNotFound(barcode);
     }
   }, [addItem, showToast]);
@@ -126,6 +147,7 @@ export function CashierScreen() {
     const updatedProducts = await getAllProducts();
     setProducts(updatedProducts);
     setNotFound(null);
+    setSeedPrefill(null);
 
     addItem({
       productId: newId,
@@ -298,15 +320,22 @@ export function CashierScreen() {
             <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
               <div className="bg-white rounded-2xl w-full max-w-md p-6 shadow-2xl">
                 <div className="mb-4">
-                  <h3 className="text-xl font-bold text-slate-800">New Barcode Detected</h3>
+                  <h3 className="text-xl font-bold text-slate-800">
+                    {seedPrefill ? 'Product Recognised' : 'New Barcode Detected'}
+                  </h3>
                   <p className="text-xs text-slate-500 mt-1">
-                    Barcode <code className="bg-slate-100 px-1.5 py-0.5 rounded font-mono font-bold text-amber-600">{notFound}</code> is not in your inventory yet. Fill in details to add it instantly:
+                    Barcode <code className="bg-slate-100 px-1.5 py-0.5 rounded font-mono font-bold text-amber-600">{notFound}</code>{' '}
+                    {seedPrefill
+                      ? 'matched our catalogue. Check the price and stock, then save:'
+                      : 'is not in your inventory yet. Fill in details to add it instantly:'}
                   </p>
                 </div>
                 <ProductForm
+                  key={seedPrefill ? seedPrefill.barcode : 'blank'}
                   barcode={notFound}
+                  initial={seedPrefill || undefined}
                   onSave={handleSaveNewProduct}
-                  onCancel={() => setNotFound(null)}
+                  onCancel={() => { setNotFound(null); setSeedPrefill(null); }}
                 />
               </div>
             </div>
@@ -626,15 +655,22 @@ export function CashierScreen() {
         <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl w-full max-w-md p-6 shadow-2xl">
             <div className="mb-4">
-              <h3 className="text-xl font-bold text-slate-800">New Barcode Detected</h3>
+              <h3 className="text-xl font-bold text-slate-800">
+                {seedPrefill ? 'Product Recognised' : 'New Barcode Detected'}
+              </h3>
               <p className="text-xs text-slate-500 mt-1">
-                Barcode <code className="bg-slate-100 px-1.5 py-0.5 rounded font-mono font-bold text-amber-600">{notFound}</code> is not in your inventory yet. Fill in details to add it instantly:
+                Barcode <code className="bg-slate-100 px-1.5 py-0.5 rounded font-mono font-bold text-amber-600">{notFound}</code>{' '}
+                {seedPrefill
+                  ? 'matched our catalogue. Check the price and stock, then save:'
+                  : 'is not in your inventory yet. Fill in details to add it instantly:'}
               </p>
             </div>
             <ProductForm
+              key={seedPrefill ? seedPrefill.barcode : 'blank'}
               barcode={notFound}
+              initial={seedPrefill || undefined}
               onSave={handleSaveNewProduct}
-              onCancel={() => setNotFound(null)}
+              onCancel={() => { setNotFound(null); setSeedPrefill(null); }}
             />
           </div>
         </div>
