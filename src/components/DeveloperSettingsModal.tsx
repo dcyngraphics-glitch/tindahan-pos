@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { useHardwareStore } from '../stores/hardwareStore';
 import { useSettingsStore } from '../stores/settingsStore';
 import { useAuthStore } from '../stores/authStore';
@@ -8,6 +8,8 @@ import { connectSerialScanner } from '../services/serialScanner';
 import { useBluetoothStatus } from '../hooks/useBluetoothStatus';
 import { useCloudSession } from '../hooks/useCloudSession';
 import { getCashierPinHash, setCashierPinHash, hashPin } from '../services/cashierPin';
+import { exportBackup, restoreBackup } from '../services/backup';
+import { ConfirmDialog } from './ConfirmDialog';
 
 interface DeveloperSettingsModalProps {
   onClose: () => void;
@@ -33,6 +35,61 @@ export function DeveloperSettingsModal({ onClose }: DeveloperSettingsModalProps)
   const [currentPinInput, setCurrentPinInput] = useState('');
   const [newPinInput, setNewPinInput] = useState('');
   const [pinMessage, setPinMessage] = useState<{ text: string; error: boolean } | null>(null);
+
+  // Backup & restore state
+  const [backupMessage, setBackupMessage] = useState<{ text: string; error: boolean } | null>(null);
+  const [restoring, setRestoring] = useState(false);
+  const [restoreConfirmOpen, setRestoreConfirmOpen] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleExportBackup = async () => {
+    setBackupMessage(null);
+    try {
+      const backup = await exportBackup();
+      const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `tindahan-pos-backup-${new Date().toISOString().slice(0, 10)}.json`;
+      link.click();
+      URL.revokeObjectURL(url);
+      setBackupMessage({
+        text: `Backup saved — ${backup.counts.products} products, ${backup.counts.transactions} sales, ${backup.counts.customers} customers, ${backup.counts.utang} debts.`,
+        error: false,
+      });
+    } catch (err: any) {
+      setBackupMessage({ text: err?.message || 'Could not create the backup.', error: true });
+    }
+  };
+
+  const handleRestoreFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    // Clear the input so picking the same file again still fires a change event.
+    e.target.value = '';
+    if (!file) return;
+    setRestoring(true);
+    setBackupMessage(null);
+    try {
+      const counts = await restoreBackup(JSON.parse(await file.text()));
+      setBackupMessage({
+        text: `Restored — ${counts.products} products, ${counts.transactions} sales, ${counts.customers} customers, ${counts.utang} debts.`,
+        error: false,
+      });
+    } catch (err: any) {
+      setBackupMessage({ text: err?.message || 'Could not restore from that file.', error: true });
+    } finally {
+      setRestoring(false);
+    }
+  };
+
+  const handleLogout = async () => {
+    try {
+      await signOut();
+      onClose();
+    } catch (err: any) {
+      setBackupMessage({ text: err?.message || 'Could not sign out.', error: true });
+    }
+  };
 
   const handleChangePin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -129,11 +186,48 @@ export function DeveloperSettingsModal({ onClose }: DeveloperSettingsModalProps)
             {accountEmail && <p className="text-xs text-slate-500">{accountEmail}</p>}
           </div>
           <button
-            onClick={() => { onClose(); void signOut(); }}
+            onClick={handleLogout}
             className="px-4 py-2 bg-red-100 hover:bg-red-200 text-red-700 font-bold text-xs rounded-xl transition"
           >
             Log Out 🚪
           </button>
+        </div>
+
+        {/* Backup & Restore */}
+        <div className="mb-6">
+          <h3 className="text-sm font-extrabold text-slate-800 uppercase tracking-wider mb-2">💾 Backup &amp; Restore</h3>
+          <p className="text-xs text-slate-500 mb-4">
+            Downloads everything — products, sales, customers, credit records and payments — into one
+            file you can keep somewhere safe. Restoring replaces whatever is on this device, so check
+            the download first.
+          </p>
+          <div className="flex flex-wrap items-center gap-3">
+            <button
+              onClick={handleExportBackup}
+              className="px-4 py-2 bg-slate-900 text-white font-bold text-xs rounded-xl shadow-sm"
+            >
+              ⬇️ Download backup
+            </button>
+            <button
+              onClick={() => setRestoreConfirmOpen(true)}
+              disabled={restoring}
+              className="px-4 py-2 bg-white border border-slate-300 text-slate-700 font-bold text-xs rounded-xl disabled:opacity-50"
+            >
+              {restoring ? 'Restoring…' : '⬆️ Restore from backup'}
+            </button>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="application/json,.json"
+              onChange={handleRestoreFile}
+              className="hidden"
+            />
+          </div>
+          {backupMessage && (
+            <p className={`mt-3 text-xs font-bold p-2 rounded-lg ${backupMessage.error ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'}`}>
+              {backupMessage.text}
+            </p>
+          )}
         </div>
 
         {/* Hardware Status & Pairing */}
@@ -180,10 +274,15 @@ export function DeveloperSettingsModal({ onClose }: DeveloperSettingsModalProps)
           </div>
         </div>
 
-        {/* Cashier Security PIN Management */}
+        {/* Cashier Shift PIN Management */}
         <div className="border-t border-slate-200 pt-6 mb-6">
-          <h3 className="text-sm font-extrabold text-slate-800 uppercase tracking-wider mb-2">🔒 Cashier Security PIN</h3>
-          <p className="text-xs text-slate-500 mb-4">Set or update the 4-digit PIN required to unlock the Cashier shift. If no PIN is set, the till opens without one.</p>
+          <h3 className="text-sm font-extrabold text-slate-800 uppercase tracking-wider mb-2">🔒 Cashier Shift PIN</h3>
+          <p className="text-xs text-slate-500 mb-4">
+            A 4-digit code that locks the till screen when the app opens, so a shared tablet cannot be
+            tapped into by accident. <strong>This is a convenience lock, not a security control</strong> —
+            anyone alone with the tablet can get past it from the browser. For real protection, use a
+            tablet passcode and sign out between shifts.
+          </p>
 
           <form onSubmit={handleChangePin} className="bg-amber-50/50 p-4 rounded-2xl border border-amber-200 space-y-3">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -263,6 +362,18 @@ export function DeveloperSettingsModal({ onClose }: DeveloperSettingsModalProps)
           </div>
         </form>
       </div>
+
+      <ConfirmDialog
+        open={restoreConfirmOpen}
+        title="Restore from backup?"
+        message="This replaces everything currently on this device with the contents of the backup file. This cannot be undone."
+        confirmLabel="Choose backup file"
+        onConfirm={() => {
+          setRestoreConfirmOpen(false);
+          fileInputRef.current?.click();
+        }}
+        onCancel={() => setRestoreConfirmOpen(false)}
+      />
     </div>
   );
 }

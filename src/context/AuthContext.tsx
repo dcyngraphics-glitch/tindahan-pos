@@ -25,9 +25,10 @@ interface AuthContextValue {
   /**
    * Signs out of Dexie Cloud and clears the locally persisted role.
    *
-   * Rejects when the addon's "you have unsynced changes" confirmation is dismissed —
-   * the caller must keep the session in that case, so nothing is cleared here until
-   * `cloudLogout` resolves.
+   * Rejects when there are changes that have not uploaded — logging out would
+   * otherwise offer to discard them. The caller must keep the session and show
+   * the message in that case, so nothing is cleared here until `cloudLogout`
+   * resolves.
    */
   signOut: () => Promise<void>;
 }
@@ -82,6 +83,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const cloudLogout = useCallback(async (): Promise<void> => {
     const cloud = (db as any).cloud;
     if (!cloud) return;
+
+    // Upload before signing out. Dexie Cloud's own logout prompt offers to
+    // throw away changes that have not uploaded yet, and a thrown-away sale was
+    // never on the server — so logout must never reach that prompt with work
+    // still queued.
+    try {
+      await cloud.sync({ purpose: 'push', wait: true });
+    } catch (err: any) {
+      if (err?.name === 'AbortError') throw err;
+      throw new Error(
+        'Could not upload your latest sales before signing out. Connect to the internet and try again — nothing has been lost.'
+      );
+    }
+
+    const state = cloud.syncState?.getValue?.();
+    if (state && state.phase === 'not-in-sync') {
+      throw new Error(
+        'Some changes have not finished uploading yet. Connect to the internet and try signing out again.'
+      );
+    }
+
     await cloud.logout();
   }, []);
 

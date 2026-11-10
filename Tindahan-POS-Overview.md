@@ -32,7 +32,7 @@ Two people can use it at the same time on two devices — one serving customers 
 - **Cashier** — the till. Checkout, barcode scanning, transaction history, inventory, dashboard, receipt printing.
 - **Inventory Staff** — stock work. Barcode scanning, the product catalogue, transaction history and the dashboard, without the checkout screen.
 
-**Cashier shift lock.** An optional 4-digit PIN can be set. Once set, the till asks for it every time the app is opened in the Cashier role, so a shared tablet cannot be used to ring up sales without the cashier's knowledge. If no PIN is set, the till opens straight away.
+**Cashier shift lock.** An optional 4-digit PIN can be set. Once set, the till asks for it every time the app is opened in the Cashier role, so a shared tablet cannot be tapped into by accident. This is a convenience lock, not a security control — anyone alone with the tablet can get past it from the browser. For real protection, use a tablet passcode and sign out between shifts. If no PIN is set, the till opens straight away.
 
 **One account, many devices.** The same sign-in works on the counter tablet and the stock phone. Data is shared between them (see *Sync and offline working* below).
 
@@ -169,9 +169,9 @@ A separate display view is designed for a second screen, tablet or TV facing the
 
 **Hardware.** Pairing and disconnecting the Bluetooth receipt printer, the Bluetooth scanner, and a USB/serial scanner, with each device's connection status shown.
 
-**Session.** Shows the signed-in role and provides sign-out. Signing out asks for confirmation first, and warns if there are changes that have not finished syncing.
+**Session.** Shows the signed-in role and provides sign-out. Signing out uploads anything that has not synced yet first; if that is not possible, the app stays signed in and explains why.
 
-**Cashier PIN.** Set or change the 4-digit shift PIN.
+**Cashier PIN.** Set or change the 4-digit shift PIN (a convenience lock, not a security control).
 
 ---
 
@@ -200,4 +200,4 @@ So expectations are clear from the start:
 6. **Open the customer display** on a second screen if one is available.
 7. **Start selling.**
 
-No installation, no server, no manual backups and no passwords are required.
+No installation, no server and no passwords are required. A full backup of your products, sales, customers and credit records can be downloaded from the settings screen.

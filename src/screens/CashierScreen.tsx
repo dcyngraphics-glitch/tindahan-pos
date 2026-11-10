@@ -11,7 +11,6 @@ import { useIsAtLeast } from '../hooks/useResponsive';
 import { printViaBluetooth } from '../services/printer';
 import { formatPeso, seedCatalogIfEmpty, SARI_SARI_SEED, type TransactionItem, type Product, type Customer } from '../services/db';
 import { getAllCustomers, addCustomer } from '../services/customers';
-import { createUtang } from '../services/utang';
 import { useCloudSession } from '../hooks/useCloudSession';
 
 // React Compiler false positive: this only runs from event handlers, never during render.
@@ -261,18 +260,15 @@ export function CashierScreen() {
         transactionItems,
         paymentType === 'cash' ? cashCents : 0,
         discount,
-        { paymentType }
+        {
+          paymentType,
+          // The debt is written inside the same transaction as the sale, so a
+          // crash can no longer leave a credit sale with no debt behind it.
+          ...(paymentType === 'utang'
+            ? { utang: { customerId: selectedCustomerId!, createdBy: accountEmail ?? 'unknown' } }
+            : {}),
+        }
       );
-
-      if (paymentType === 'utang') {
-        await createUtang({
-          customerId: selectedCustomerId!,
-          transactionId,
-          items: transactionItems,
-          total,
-          createdBy: accountEmail ?? 'unknown',
-        });
-      }
 
       const completedReceipt = {
         id: transactionId,

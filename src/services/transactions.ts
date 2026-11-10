@@ -68,7 +68,15 @@ export async function createTransaction(
   items: TransactionItem[],
   cashTendered: number,
   discount?: { type: 'percent' | 'fixed'; value: number } | null,
-  opts?: { paymentType?: 'cash' | 'utang' }
+  opts?: {
+    paymentType?: 'cash' | 'utang';
+    /**
+     * For a credit sale, the debt is written inside the same database
+     * transaction as the sale itself. Two separate writes meant a crash in
+     * between could leave a sale recorded as utang with no debt to show for it.
+     */
+    utang?: { customerId: string; createdBy: string };
+  }
 ): Promise<string> {
   const paymentType = opts?.paymentType ?? 'cash';
   let total = items.reduce((sum, item) => sum + item.price * item.quantity, 0);
@@ -96,7 +104,7 @@ export async function createTransaction(
   const now = new Date();
 
   // Use database transaction to ensure atomicity
-  await db.transaction('rw', db.products, db.transactions, async () => {
+  await db.transaction('rw', db.products, db.transactions, db.utang, async () => {
     // First check stock for all items - collect errors first
     const stockErrors: InsufficientStockError[] = [];
     for (const item of items) {
@@ -151,6 +159,20 @@ export async function createTransaction(
       paymentType,
       ...(discount ? { discount } : {}),
     });
+
+    if (paymentType === 'utang' && opts?.utang) {
+      if (!opts.utang.customerId) throw new Error('Choose a customer before recording utang.');
+      await db.utang.add({
+        id: generateId(),
+        customerId: opts.utang.customerId,
+        transactionId: id,
+        items,
+        total: effectiveTotal,
+        createdBy: opts.utang.createdBy,
+        createdAt: now,
+        updatedAt: now,
+      });
+    }
   });
 
   return id;

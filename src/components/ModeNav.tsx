@@ -19,6 +19,7 @@ export function ModeNav({ isOpen, onClose, lowStockCount = 0 }: ModeNavProps) {
   const { signOut } = useAuth();
   const [devSettingsOpen, setDevSettingsOpen] = useState(false);
   const [logoutConfirmOpen, setLogoutConfirmOpen] = useState(false);
+  const [logoutError, setLogoutError] = useState('');
 
   const cashierModes: { id: AppMode; label: string; icon: string }[] = [
     { id: 'cashier', label: 'Cashier', icon: '💰' },
@@ -129,13 +130,23 @@ export function ModeNav({ isOpen, onClose, lowStockCount = 0 }: ModeNavProps) {
       <ConfirmDialog
         open={logoutConfirmOpen}
         title="Log Out?"
-        message="You will be signed out of your account on this device."
+        message={
+          logoutError ||
+          'You will be signed out of your account on this device. Anything not yet uploaded is uploaded first.'
+        }
         confirmLabel="Log Out"
         onConfirm={() => {
-          setLogoutConfirmOpen(false);
-          void signOut();
+          // signOut() uploads pending changes before signing out. If it cannot,
+          // stay signed in and say why — logging out anyway would risk
+          // discarding sales that were never uploaded.
+          void signOut().catch((err: unknown) => {
+            setLogoutError(err instanceof Error ? err.message : 'Could not sign out. Please try again.');
+          });
         }}
-        onCancel={() => setLogoutConfirmOpen(false)}
+        onCancel={() => {
+          setLogoutError('');
+          setLogoutConfirmOpen(false);
+        }}
       />
 
       {devSettingsOpen && <DeveloperSettingsModal onClose={() => setDevSettingsOpen(false)} />}

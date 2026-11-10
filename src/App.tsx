@@ -13,6 +13,7 @@ import { DashboardScreen } from './screens/DashboardScreen';
 import { ScannerScreen } from './screens/ScannerScreen';
 import { TransactionHistoryScreen } from './screens/TransactionHistoryScreen';
 import { UtangScreen } from './screens/UtangScreen';
+import { SyncIndicator } from './components/SyncIndicator';
 import { CustomerDisplay } from './screens/CustomerDisplayScreen';
 import { LoginScreen } from './components/LoginScreen';
 import { seedCatalogIfEmpty, E2E_MODE } from './services/db';
@@ -106,6 +107,7 @@ function MainApp() {
   const { email: accountEmail } = useCloudSession();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [logoutConfirmOpen, setLogoutConfirmOpen] = useState(false);
+  const [logoutError, setLogoutError] = useState('');
   const [lowStockCount, setLowStockCount] = useState(0);
   const isTabletOrLarger = useIsAtLeast('tablet');
 
@@ -129,15 +131,18 @@ function MainApp() {
 
   // One logout path for both the header button and the drawer entry: the header
   // used to sign out immediately while the drawer asked first.
-  const handleLogout = () => setLogoutConfirmOpen(true);
+  const handleLogout = () => {
+    setLogoutError('');
+    setLogoutConfirmOpen(true);
+  };
 
   const confirmLogout = () => {
     setLogoutConfirmOpen(false);
-    // signOut() signs out of Dexie Cloud and clears the persisted role. It rejects when
-    // the user dismisses the unsynced-changes confirmation, in which case the session
-    // (local role included) is deliberately kept.
+    // signOut() uploads any pending changes before signing out, and rejects if
+    // they cannot be uploaded — logging out anyway would offer to discard them.
+    // Keeping the session and showing the reason is the safe outcome.
     void signOut().catch((err: unknown) => {
-      console.error('[auth] Sign-out failed:', err);
+      setLogoutError(err instanceof Error ? err.message : 'Could not sign out. Please try again.');
     });
   };
 
@@ -178,6 +183,7 @@ function MainApp() {
           </div>
         </div>
         <div className="flex items-center gap-3">
+          <SyncIndicator />
           <span className="text-xs bg-amber-100 text-amber-900 px-3 py-1 rounded-full font-bold capitalize">
             {role}
           </span>
@@ -189,6 +195,19 @@ function MainApp() {
           </button>
         </div>
       </header>
+
+      {logoutError && (
+        <div className="bg-red-50 border-b border-red-200 px-4 py-3 flex items-start justify-between gap-3">
+          <p className="text-sm text-red-700 font-medium">{logoutError}</p>
+          <button
+            onClick={() => setLogoutError('')}
+            aria-label="Dismiss"
+            className="shrink-0 text-red-600 font-bold"
+          >
+            ✕
+          </button>
+        </div>
+      )}
 
       {/* ModeNav Sidebar - collapsible for all roles; visible by default for inventory staff on mobile */}
       <ModeNav
