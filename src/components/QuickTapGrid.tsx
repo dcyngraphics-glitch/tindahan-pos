@@ -55,11 +55,11 @@ export function QuickTapGrid({ products, onProductsUpdated, onWeightProduct }: Q
           <div key={product.id} className="relative group">
             <button
               onClick={() => handleTap(product)}
-              disabled={product.stock <= 0}
+              disabled={!product.soldByWeight && product.stock <= 0}
               title={product.name}
               className="relative w-full flex flex-col items-center justify-between p-3 bg-white border-2 border-slate-200 hover:border-amber-400 rounded-2xl transition-all active:scale-95 shadow-sm hover:shadow-md disabled:opacity-40 disabled:cursor-not-allowed h-28 text-center"
             >
-              {product.stock <= 0 && (
+              {!product.soldByWeight && product.stock <= 0 && (
                 <span className="absolute top-1 left-1 bg-red-600 text-white text-xs font-extrabold px-1.5 py-0.5 rounded-md uppercase tracking-wider shadow-sm z-10">
                   Out
                 </span>
@@ -71,8 +71,8 @@ export function QuickTapGrid({ products, onProductsUpdated, onWeightProduct }: Q
                 <span className="text-sm font-black text-amber-600 block">
                   ₱{(product.price / 100).toFixed(2)}
                 </span>
-                <span className={`text-xs font-bold ${product.stock <= 0 ? 'text-red-600 font-black' : product.stock <= 5 ? 'text-red-700' : 'text-slate-500'}`}>
-                  Stock: {product.stock}
+                <span className={`text-xs font-bold ${product.soldByWeight ? 'text-emerald-600' : product.stock <= 0 ? 'text-red-600 font-black' : product.stock <= 5 ? 'text-red-700' : 'text-slate-500'}`}>
+                  {product.soldByWeight ? 'per kg' : `Stock: ${product.stock}`}
                 </span>
               </div>
             </button>

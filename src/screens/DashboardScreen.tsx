@@ -100,7 +100,7 @@ export function DashboardScreen() {
   const profitMarginPercent = totalRevenue > 0 ? ((totalProfit / totalRevenue) * 100).toFixed(1) : '0';
   const totalTransactionsCount = activeTransactions.length;
   const averageTransaction = totalTransactionsCount > 0 ? totalRevenue / totalTransactionsCount : 0;
-  const lowStockProducts = products.filter(p => p.stock <= 5);
+  const lowStockProducts = products.filter(p => !p.soldByWeight && p.stock <= 5);
 
   // Daily sales aggregation for chart
   const chartData = useMemo(() => {
@@ -349,9 +349,9 @@ export function DashboardScreen() {
                     </div>
                     <div className="text-right">
                       <span className={`inline-block px-2.5 py-1 text-xs font-black rounded-lg ${
-                        p.stock <= 0 ? 'bg-red-600 text-white' : 'bg-red-100 text-red-700'
+                        p.soldByWeight ? 'bg-emerald-100 text-emerald-700' : p.stock <= 0 ? 'bg-red-600 text-white' : 'bg-red-100 text-red-700'
                       }`}>
-                        {p.stock <= 0 ? 'Out of Stock' : `${p.stock} left`}
+                        {p.soldByWeight ? 'per kg' : p.stock <= 0 ? 'Out of Stock' : `${p.stock} left`}
                       </span>
                     </div>
                   </div>

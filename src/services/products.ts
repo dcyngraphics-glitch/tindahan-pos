@@ -135,7 +135,8 @@ export async function decrementStock(productId: string, quantity: number): Promi
 
 export async function getLowStockProducts(threshold = 10): Promise<Product[]> {
   try {
-    return await db.products.filter(p => p.stock <= threshold).toArray();
+    // Crops are not stock-tracked, so they can never be "low".
+    return await db.products.filter(p => !p.soldByWeight && p.stock <= threshold).toArray();
   } catch (err) {
     console.error('Failed to get low stock products:', err);
     throw new Error('Failed to load low stock products');

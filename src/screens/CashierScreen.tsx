@@ -195,7 +195,11 @@ export function CashierScreen() {
 
     const product = await getProductByBarcode(barcode);
     if (product) {
-      if (product.stock > 0) {
+      // Crops are not stock-tracked, so they must not fall into the out-of-stock
+      // branch — scanning one opens the weight keypad instead.
+      if (product.soldByWeight) {
+        setWeighing(product);
+      } else if (product.stock > 0) {
         addItem({
           productId: product.id,
           barcode: product.barcode,

@@ -282,7 +282,7 @@ export function InventoryScreen() {
                     <td className="py-3 text-xs font-mono text-slate-400">{product.barcode}</td>
                     <td className="py-3 text-right">{formatPeso(product.price)}</td>
                     <td className="py-3 text-right text-slate-500 text-sm">{formatPeso(product.cost)}</td>
-                    <td className={`py-3 text-right font-semibold ${product.stock <= 5 ? 'text-red-700' : 'text-slate-700'}`}>
+                    <td className={`py-3 text-right font-semibold ${!product.soldByWeight && product.stock <= 5 ? 'text-red-700' : 'text-slate-700'}`}>
                       {product.stock}
                     </td>
                     <td className="py-3 text-right">
@@ -313,15 +313,18 @@ export function InventoryScreen() {
                       <p className="font-medium truncate">{product.name}</p>
                       {/* The tablet list colours stock red at <=5; the phone card
                           used to show the same number in plain grey. */}
-                      {product.stock <= 0 && (
+                      {product.soldByWeight && (
+                        <span className="bg-emerald-100 text-emerald-700 text-xs font-extrabold px-1.5 py-0.5 rounded-md uppercase tracking-wider shrink-0">per kg</span>
+                      )}
+                      {!product.soldByWeight && product.stock <= 0 && (
                         <span className="bg-red-600 text-white text-xs font-extrabold px-1.5 py-0.5 rounded-md uppercase tracking-wider shrink-0">Out</span>
                       )}
-                      {product.stock > 0 && product.stock <= 5 && (
+                      {!product.soldByWeight && product.stock > 0 && product.stock <= 5 && (
                         <span className="bg-red-100 text-red-700 text-xs font-extrabold px-1.5 py-0.5 rounded-md uppercase tracking-wider shrink-0">Low</span>
                       )}
                     </div>
-                    <p className={`text-sm ${product.stock <= 5 ? 'text-red-700 font-bold' : 'text-slate-600'}`}>
-                      {formatPeso(product.price)} · Stock: {product.stock}
+                    <p className={`text-sm ${!product.soldByWeight && product.stock <= 5 ? 'text-red-700 font-bold' : 'text-slate-600'}`}>
+                      {formatPeso(product.price)}{product.soldByWeight ? ' /kg' : ` · Stock: ${product.stock}`}
                     </p>
                     <p className="text-xs text-slate-500 font-mono truncate">{product.barcode}</p>
                     {product.category && (
