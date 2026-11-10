@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, lazy, Suspense } from 'react';
 import { useAppStore, modeFromLocation } from './stores/appStore';
 import { useAuthStore } from './stores/authStore';
 import { AuthProvider, useAuth } from './context/AuthContext';
@@ -9,7 +9,6 @@ import { ConfirmDialog } from './components/ConfirmDialog';
 import { CashierPinGate } from './components/CashierPinGate';
 import { CashierScreen } from './screens/CashierScreen';
 import { InventoryScreen } from './screens/InventoryScreen';
-import { DashboardScreen } from './screens/DashboardScreen';
 import { ScannerScreen } from './screens/ScannerScreen';
 import { TransactionHistoryScreen } from './screens/TransactionHistoryScreen';
 import { UtangScreen } from './screens/UtangScreen';
@@ -19,6 +18,12 @@ import { LoginScreen } from './components/LoginScreen';
 import { seedCatalogIfEmpty, E2E_MODE } from './services/db';
 import { getLowStockProducts } from './services/products';
 import { useIsAtLeast } from './hooks/useResponsive';
+
+// recharts is heavy and only the dashboard uses it, so it is fetched when the
+// dashboard opens instead of on every page load.
+const DashboardScreen = lazy(() =>
+  import('./screens/DashboardScreen').then(m => ({ default: m.DashboardScreen }))
+);
 
 export default function App() {
   return (
@@ -223,7 +228,9 @@ function MainApp() {
             {mode === 'scanner' && <ScannerScreen />}
             {mode === 'inventory' && <InventoryScreen />}
             {mode === 'history' && <TransactionHistoryScreen />}
-            {mode === 'dashboard' && <DashboardScreen />}
+            <Suspense fallback={null}>
+              {mode === 'dashboard' && <DashboardScreen />}
+            </Suspense>
           </div>
         ) : (
           <div className="flex-1 flex flex-col w-full bg-white min-h-0">
@@ -231,7 +238,9 @@ function MainApp() {
             {mode === 'utang' && <UtangScreen />}
             {mode === 'history' && <TransactionHistoryScreen />}
             {mode === 'inventory' && <InventoryScreen />}
-            {mode === 'dashboard' && <DashboardScreen />}
+            <Suspense fallback={null}>
+              {mode === 'dashboard' && <DashboardScreen />}
+            </Suspense>
             {mode === 'scanner' && <ScannerScreen />}
           </div>
         )}

@@ -3,6 +3,8 @@ import { getAllTransactions, voidTransaction } from '../services/transactions';
 import { printViaBluetooth } from '../services/printer';
 import { formatPeso, type Transaction } from '../services/db';
 
+const PAGE_SIZE = 50;
+
 export function TransactionHistoryScreen() {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(true);
@@ -10,6 +12,12 @@ export function TransactionHistoryScreen() {
   const [filter, setFilter] = useState<'all' | 'valid' | 'voided'>('all');
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
+  const [page, setPage] = useState(1);
+
+  // Changing the search or filter invalidates the current page.
+  useEffect(() => {
+    setPage(1);
+  }, [search, filter]);
 
   const showToast = (msg: string) => {
     setToast(msg);
@@ -76,6 +84,11 @@ export function TransactionHistoryScreen() {
     return true;
   });
 
+  // Rendering every sale on one page froze the tab once history grew. Page the
+  // filtered list instead — the Inventory screen already works this way.
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const pageTransactions = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+
   return (
     <div className="flex-1 pb-32 overflow-y-auto bg-slate-50">
       <header className="p-4 bg-white border-b border-slate-200 flex flex-wrap items-center justify-between gap-3">
@@ -133,7 +146,7 @@ export function TransactionHistoryScreen() {
           </div>
         ) : (
           <div className="space-y-3">
-            {filtered.map(tx => {
+            {pageTransactions.map(tx => {
               const isExpanded = expandedId === tx.id;
               const dateStr = new Date(tx.createdAt).toLocaleString('en-PH', {
                 month: 'short',
@@ -234,6 +247,29 @@ export function TransactionHistoryScreen() {
                 </div>
               );
             })}
+          </div>
+        )}
+
+        {/* Pagination */}
+        {filtered.length > 0 && (
+          <div className="flex items-center justify-center gap-3 pt-2">
+            <button
+              onClick={() => setPage(p => Math.max(1, p - 1))}
+              disabled={page === 1}
+              className="px-4 py-2 bg-white border border-slate-200 text-slate-700 font-medium rounded-lg min-w-[44px] min-h-[44px] disabled:opacity-50 transition"
+            >
+              Prev
+            </button>
+            <span className="text-sm text-slate-600">
+              Page {page} of {totalPages} · {filtered.length} sales
+            </span>
+            <button
+              onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+              disabled={page === totalPages}
+              className="px-4 py-2 bg-white border border-slate-200 text-slate-700 font-medium rounded-lg min-w-[44px] min-h-[44px] disabled:opacity-50 transition"
+            >
+              Next
+            </button>
           </div>
         )}
       </div>
