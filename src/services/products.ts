@@ -19,6 +19,7 @@ function sanitizeProductData(data: Partial<Omit<Product, 'id' | 'createdAt' | 'u
   if (data.category !== undefined) result.category = data.category ? sanitizeInput(data.category) : undefined;
   if (data.image !== undefined) result.image = data.image;
   if (data.isQuickTap !== undefined) result.isQuickTap = data.isQuickTap;
+  if (data.soldByWeight !== undefined) result.soldByWeight = data.soldByWeight;
   return result;
 }
 

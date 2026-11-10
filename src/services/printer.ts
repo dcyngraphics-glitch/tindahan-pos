@@ -1,9 +1,10 @@
 import { useHardwareStore } from '../stores/hardwareStore';
 import { useSettingsStore } from '../stores/settingsStore';
+import { lineTotal, formatWeight } from './db';
 
 export interface BluetoothPrinterService {
   printReceipt: (receipt: {
-    items: Array<{ name: string; price: number; quantity: number }>;
+    items: Array<{ name: string; price: number; quantity: number; soldByWeight?: boolean }>;
     total: number;
     cashTendered: number;
     change: number;
@@ -25,7 +26,7 @@ const PRINTER_CHARACTERISTICS = [
 ];
 
 export async function printViaBluetooth(receipt: {
-  items: Array<{ name: string; price: number; quantity: number }>;
+  items: Array<{ name: string; price: number; quantity: number; soldByWeight?: boolean }>;
   total: number;
   cashTendered: number;
   change: number;
@@ -104,9 +105,15 @@ export async function printViaBluetooth(receipt: {
     commands += '\x1B\x61\x00'; // Left alignment
 
     for (const item of receipt.items) {
-      const lineTotal = ((item.price * item.quantity) / 100).toFixed(2);
-      commands += `${item.quantity}x ${item.name}\n`;
-      commands += `   @₱${(item.price / 100).toFixed(2)} = ₱${lineTotal}\n`;
+      // Weight lines are rounded to the nearest peso, same as everywhere else.
+      const total = (lineTotal(item) / 100).toFixed(2);
+      const unit = (item.price / 100).toFixed(2);
+      commands += item.soldByWeight
+        ? `${formatWeight(item.quantity)} ${item.name}\n`
+        : `${item.quantity}x ${item.name}\n`;
+      commands += item.soldByWeight
+        ? `   @₱${unit}/kg = ₱${total}\n`
+        : `   @₱${unit} = ₱${total}\n`;
     }
 
     commands += '--------------------------------\n';

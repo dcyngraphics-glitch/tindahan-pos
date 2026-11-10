@@ -1,4 +1,4 @@
-import { db, type Transaction, type TransactionItem, generateId } from './db';
+import { db, lineTotal, type Transaction, type TransactionItem, generateId } from './db';
 
 export class InsufficientStockError extends Error {
   productId: string;
@@ -79,7 +79,7 @@ export async function createTransaction(
   }
 ): Promise<string> {
   const paymentType = opts?.paymentType ?? 'cash';
-  let total = items.reduce((sum, item) => sum + item.price * item.quantity, 0);
+  let total = items.reduce((sum, item) => sum + lineTotal(item), 0);
   let effectiveTotal = total;
 
   // Apply discount to the stored total so DB and receipt are consistent
@@ -108,6 +108,8 @@ export async function createTransaction(
     // First check stock for all items - collect errors first
     const stockErrors: InsufficientStockError[] = [];
     for (const item of items) {
+      // Crops sold by weight are not stock-tracked.
+      if (item.soldByWeight) continue;
       const product = await db.products.get(item.productId);
       if (!product) {
         throw new Error(`Product not found: ${item.name}`);
@@ -125,6 +127,7 @@ export async function createTransaction(
     // All stock checks passed - atomically decrement stock using bulk modify
     // This uses a single WHERE clause to ensure atomic check-and-update
     for (const item of items) {
+      if (item.soldByWeight) continue;
       const updated = await db.products
         .where('id')
         .equals(item.productId)
@@ -237,7 +240,7 @@ export async function getSalesSummary(startDate: Date, endDate: Date): Promise<{
           productStats[item.productId] = { name: item.name, quantity: 0, revenue: 0 };
         }
         productStats[item.productId].quantity += item.quantity;
-        productStats[item.productId].revenue += item.price * item.quantity;
+        productStats[item.productId].revenue += lineTotal(item);
       }
     }
 

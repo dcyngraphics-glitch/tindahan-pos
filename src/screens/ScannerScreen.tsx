@@ -50,7 +50,7 @@ export function ScannerScreen() {
 
   useBarcodeScannerListener(handleScan);
 
-  const handleSave = async (data: { barcode: string; name: string; price: number; cost: number; stock: number; category?: string; isQuickTap?: boolean }) => {
+  const handleSave = async (data: { barcode: string; name: string; price: number; cost: number; stock: number; category?: string; isQuickTap?: boolean; soldByWeight?: boolean }) => {
     if (editingProduct && editingProduct.id) {
       await updateProduct(editingProduct.id, data);
       setSuccessMessage(`Updated product: ${data.name}`);

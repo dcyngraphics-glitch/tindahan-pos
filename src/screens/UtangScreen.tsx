@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { formatPeso, type Customer, type TransactionItem } from '../services/db';
+import { formatPeso, lineTotal, formatWeight, type Customer, type TransactionItem } from '../services/db';
 import {
   getAllCustomers,
   addCustomer,
@@ -299,8 +299,8 @@ export function UtangScreen() {
                   <div className="min-w-0">
                     <p className="font-semibold text-slate-900 truncate">{customerNameOf(d.customerId)}</p>
                     <p className="text-xs text-slate-500 mt-0.5">
-                      {d.items.reduce((n, i) => n + i.quantity, 0)} item
-                        {d.items.reduce((n, i) => n + i.quantity, 0) === 1 ? '' : 's'} ·{' '}
+                      {d.items.reduce((n, i) => n + (i.soldByWeight ? 1 : i.quantity), 0)} item
+                        {d.items.reduce((n, i) => n + (i.soldByWeight ? 1 : i.quantity), 0) === 1 ? '' : 's'} ·{' '}
                       {daysAgo(d.createdAt)}
                     </p>
                   </div>
@@ -364,7 +364,7 @@ export function UtangScreen() {
                 </h3>
                 <p className="text-xs text-slate-500 mt-0.5">
                   {daysAgo(openDebt.createdAt)} ·{' '}
-                  {openDebt.items.reduce((n, i) => n + i.quantity, 0)} items
+                  {openDebt.items.reduce((n, i) => n + (i.soldByWeight ? 1 : i.quantity), 0)} items
                 </p>
               </div>
               <button
@@ -397,10 +397,10 @@ export function UtangScreen() {
                   {openDebt.items.map((i: TransactionItem, idx: number) => (
                     <div key={idx} className="flex justify-between text-sm">
                       <span className="text-slate-700 truncate mr-3">
-                        {i.quantity}× {i.name}
+                        {i.soldByWeight ? `${formatWeight(i.quantity)} ${i.name}` : `${i.quantity}× ${i.name}`}
                       </span>
                       <span className="font-bold text-slate-900 shrink-0">
-                        {formatPeso(i.price * i.quantity)}
+                        {formatPeso(lineTotal(i))}
                       </span>
                     </div>
                   ))}

@@ -6,15 +6,21 @@ import { updateProduct } from '../services/products';
 interface QuickTapGridProps {
   products: Product[];
   onProductsUpdated?: () => void;
+  /** Crops are priced per kilo, so tapping one opens the weight keypad. */
+  onWeightProduct?: (product: Product) => void;
 }
 
-export function QuickTapGrid({ products, onProductsUpdated }: QuickTapGridProps) {
+export function QuickTapGrid({ products, onProductsUpdated, onWeightProduct }: QuickTapGridProps) {
   const { addItem } = useCartStore();
   const [pickerOpen, setPickerOpen] = useState(false);
   const [search, setSearch] = useState('');
   const [filterRecommended, setFilterRecommended] = useState(false);
 
   const handleTap = (product: Product) => {
+    if (product.soldByWeight) {
+      onWeightProduct?.(product);
+      return;
+    }
     if (product.stock > 0) {
       addItem({
         productId: product.id,

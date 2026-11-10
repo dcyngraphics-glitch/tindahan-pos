@@ -3,13 +3,15 @@ import { useCartStore } from '../stores/cartStore';
 import { getProductByBarcode, getAllProducts, addProduct } from '../services/products';
 import { createTransaction, voidTransaction } from '../services/transactions';
 import { QuickTapGrid } from '../components/QuickTapGrid';
+import { CropsGrid } from '../components/CropsGrid';
+import { WeightPanel } from '../components/WeightPanel';
 import { ProductForm } from '../components/ProductForm';
 import { useBarcodeScannerListener } from '../hooks/useBarcodeScannerListener';
 import { useScannerDetection } from '../hooks/useScannerDetection';
 import { useBluetoothStatus } from '../hooks/useBluetoothStatus';
 import { useIsAtLeast } from '../hooks/useResponsive';
 import { printViaBluetooth } from '../services/printer';
-import { formatPeso, seedCatalogIfEmpty, SARI_SARI_SEED, type TransactionItem, type Product, type Customer } from '../services/db';
+import { formatPeso, lineTotal, formatWeight, seedCatalogIfEmpty, SARI_SARI_SEED, type TransactionItem, type Product, type Customer } from '../services/db';
 import { getAllCustomers, addCustomer } from '../services/customers';
 import { useCloudSession } from '../hooks/useCloudSession';
 
@@ -19,7 +21,7 @@ const receiptDate = () => new Date();
 export function CashierScreen() {
   const isTabletOrLarger = useIsAtLeast('tablet');
   const isDesktopOrLarger = useIsAtLeast('desktop');
-  const { items, addItem, removeItem, updateQuantity, clearCart, getTotal, getDiscountedTotal, discount, setDiscount } = useCartStore();
+  const { items, addItem, removeItem, updateQuantity, updateItem, clearCart, getTotal, getDiscountedTotal, getItemCount, discount, setDiscount } = useCartStore();
   const { isConnected: scannerConnected, activityCount: scannerActivity } = useScannerDetection();
   const { isConnected: printerConnected, printerName, connectPrinter } = useBluetoothStatus();
 
@@ -49,6 +51,11 @@ export function CashierScreen() {
   const [showNewCustomer, setShowNewCustomer] = useState(false);
   const [checkoutError, setCheckoutError] = useState('');
 
+  // "🌾 Crops & Feed" tab + the weight keypad for crops sold by the kilo.
+  const [cashierTab, setCashierTab] = useState<'quicktap' | 'crops'>('quicktap');
+  const [weighing, setWeighing] = useState<Product | null>(null);
+  const [editingCartLine, setEditingCartLine] = useState<string | null>(null);
+
   const total = getDiscountedTotal();
   const selectedCustomer = customers.find(c => c.id === selectedCustomerId) ?? null;
 
@@ -74,6 +81,38 @@ export function CashierScreen() {
     if (!q) return sorted;
     return sorted.filter(c => `${c.name} ${c.phone ?? ''}`.toLowerCase().includes(q));
   }, [customers, customerSearch]);
+
+  /** Open the weight keypad for a crop. */
+  const openWeigh = (product: Product) => {
+    setEditingCartLine(null);
+    setWeighing(product);
+  };
+
+  /** Re-open the keypad for a weighed line already in the cart. */
+  const openEditWeigh = (item: TransactionItem & { cartId: string }) => {
+    const product = products.find(p => p.id === item.productId);
+    if (!product) return;
+    setEditingCartLine(item.cartId);
+    setWeighing(product);
+  };
+
+  const handleWeighed = (weightKg: number, pricePerKgCents: number) => {
+    if (!weighing) return;
+    if (editingCartLine) {
+      updateItem(editingCartLine, { quantity: weightKg, price: pricePerKgCents });
+    } else {
+      addItem({
+        productId: weighing.id,
+        barcode: weighing.barcode,
+        name: weighing.name,
+        price: pricePerKgCents,
+        quantity: weightKg,
+        soldByWeight: true,
+      });
+    }
+    setWeighing(null);
+    setEditingCartLine(null);
+  };
 
   const chooseCustomer = async (data: { name: string; phone?: string }) => {
     // Adding a customer inline from the till should not lose the sale in progress.
@@ -188,7 +227,7 @@ export function CashierScreen() {
     }
   }, [addItem, showToast]);
 
-  const handleSaveNewProduct = async (data: { barcode: string; name: string; price: number; cost: number; stock: number; category?: string }) => {
+  const handleSaveNewProduct = async (data: { barcode: string; name: string; price: number; cost: number; stock: number; category?: string; isQuickTap?: boolean; soldByWeight?: boolean }) => {
     const newId = await addProduct(data);
     const updatedProducts = await getAllProducts();
     setProducts(updatedProducts);
@@ -254,6 +293,9 @@ export function CashierScreen() {
         name: i.name,
         price: i.price,
         quantity: i.quantity,
+        // Without this the saved sale loses its weight: it would be charged at
+        // the unrounded centavo and the stock check would run against a crop.
+        soldByWeight: i.soldByWeight,
       }));
 
       const transactionId = await createTransaction(
@@ -316,9 +358,10 @@ export function CashierScreen() {
     if (!receipt) return '';
     const r = receipt;
     const line = '--------------------------------';
-    const rows = r.items.map(i =>
-      `${i.name.padEnd(20).slice(0, 20)} x${i.quantity}  ${formatPeso(i.price * i.quantity)}`
-    );
+    const rows = r.items.map(i => {
+      const label = i.soldByWeight ? `${formatWeight(i.quantity)} ${i.name}` : `x${i.quantity} ${i.name}`;
+      return `${label.slice(0, 24).padEnd(24)} ${formatPeso(lineTotal(i))}`;
+    });
     return [
       '         TINDAHAN POS         ',
       line,
@@ -440,25 +483,39 @@ export function CashierScreen() {
                   <div key={item.cartId} className="bg-white p-4 rounded-xl shadow-sm flex items-center gap-4 border border-slate-100">
                     <div className="flex-1 min-w-0">
                       <p className="font-semibold text-slate-900 truncate">{item.name}</p>
-                      <p className="text-sm text-slate-500">{formatPeso(item.price)} each</p>
+                      <p className="text-sm text-slate-500">
+                        {item.soldByWeight
+                          ? `${formatWeight(item.quantity)} × ${formatPeso(item.price)}/kg`
+                          : `${formatPeso(item.price)} each`}
+                      </p>
                     </div>
-                    <div className="flex items-center gap-3">
+                    {item.soldByWeight ? (
                       <button
-                        onClick={() => updateQuantity(item.cartId, item.quantity - 1)}
-                        className="w-11 h-11 bg-slate-100 border border-slate-200 rounded-lg text-xl font-bold active:bg-slate-200 flex-shrink-0"
+                        onClick={() => openEditWeigh(item)}
+                        aria-label={`Change weight for ${item.name}`}
+                        className="px-3 py-2 bg-amber-50 border border-amber-200 text-amber-800 text-sm font-bold rounded-lg min-h-[44px]"
                       >
-                        −
+                        {formatWeight(item.quantity)}
                       </button>
-                      <span className="w-12 text-center font-bold text-lg">{item.quantity}</span>
-                      <button
-                        onClick={() => updateQuantity(item.cartId, item.quantity + 1)}
-                        className="w-11 h-11 bg-slate-100 border border-slate-200 rounded-lg text-xl font-bold active:bg-slate-200 flex-shrink-0"
-                      >
-                        +
-                      </button>
-                    </div>
+                    ) : (
+                      <div className="flex items-center gap-3">
+                        <button
+                          onClick={() => updateQuantity(item.cartId, item.quantity - 1)}
+                          className="w-11 h-11 bg-slate-100 border border-slate-200 rounded-lg text-xl font-bold active:bg-slate-200 flex-shrink-0"
+                        >
+                          −
+                        </button>
+                        <span className="w-12 text-center font-bold text-lg">{item.quantity}</span>
+                        <button
+                          onClick={() => updateQuantity(item.cartId, item.quantity + 1)}
+                          className="w-11 h-11 bg-slate-100 border border-slate-200 rounded-lg text-xl font-bold active:bg-slate-200 flex-shrink-0"
+                        >
+                          +
+                        </button>
+                      </div>
+                    )}
                     <div className="text-right w-24">
-                      <p className="font-bold text-lg text-slate-900">{formatPeso(item.price * item.quantity)}</p>
+                      <p className="font-bold text-lg text-slate-900">{formatPeso(lineTotal(item))}</p>
                       <button
                         onClick={() => removeItem(item.cartId)}
                         aria-label={`Remove ${item.name} from cart`}
@@ -475,7 +532,7 @@ export function CashierScreen() {
             {/* Checkout Footer - pinned to the bottom of the pane */}
             <div className="p-4 bg-white border-t border-slate-200 flex justify-between items-center flex-shrink-0 shadow-2xl">
               <div>
-                <p className="text-sm text-slate-500">Total Items: {items.reduce((sum, i) => sum + i.quantity, 0)}</p>
+                <p className="text-sm text-slate-500">Total Items: {getItemCount()}</p>
                 <p className="text-3xl font-black text-slate-900">{formatPeso(total)}</p>
               </div>
               <div className="flex gap-3">
@@ -503,20 +560,39 @@ export function CashierScreen() {
             footer down the screen. */}
         {quickTapExpanded && (
           <div className="w-[400px] lg:w-[480px] flex flex-col border-l border-slate-200 overflow-hidden flex-shrink-0 bg-slate-50">
-            <div className="p-4 border-b border-slate-200 bg-white flex justify-between items-center flex-shrink-0">
-              <div>
-                <h2 className="font-bold text-slate-800">⚡ QuickTap 4x4 Products</h2>
-                <p className="text-xs text-slate-400">Click '+ Add QuickTap' to pin products</p>
+            <div className="p-3 border-b border-slate-200 bg-white flex-shrink-0">
+              <div className="flex items-center justify-between gap-2 mb-2">
+                <div className="flex gap-1 bg-slate-100 rounded-lg p-1">
+                  <button
+                    onClick={() => setCashierTab('quicktap')}
+                    className={`px-3 py-2 rounded-md text-xs font-bold min-h-[44px] ${cashierTab === 'quicktap' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500'}`}
+                  >
+                    ⚡ QuickTap
+                  </button>
+                  <button
+                    onClick={() => setCashierTab('crops')}
+                    className={`px-3 py-2 rounded-md text-xs font-bold min-h-[44px] ${cashierTab === 'crops' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500'}`}
+                  >
+                    🌾 Crops & Feed
+                  </button>
+                </div>
+                <button
+                  onClick={() => setQuickTapExpanded(false)}
+                  className="text-xs text-amber-600 font-bold hover:underline min-h-[44px]"
+                >
+                  Hide
+                </button>
               </div>
-              <button
-                onClick={() => setQuickTapExpanded(false)}
-                className="text-xs text-amber-600 font-bold hover:underline min-h-[44px]"
-              >
-                Hide
-              </button>
+              {cashierTab === 'quicktap' && (
+                <p className="text-xs text-slate-400">Click '+ Add QuickTap' to pin products</p>
+              )}
             </div>
             <div className="flex-1 min-h-0 overflow-y-auto p-2">
-              <QuickTapGrid products={products} onProductsUpdated={() => getAllProducts().then(setProducts)} />
+              {cashierTab === 'quicktap' ? (
+                <QuickTapGrid products={products} onProductsUpdated={() => getAllProducts().then(setProducts)} onWeightProduct={openWeigh} />
+              ) : (
+                <CropsGrid products={products} onPick={openWeigh} />
+              )}
             </div>
           </div>
         )}
@@ -761,8 +837,8 @@ export function CashierScreen() {
               <div className="space-y-2 max-h-48 overflow-y-auto text-sm">
                 {receipt.items.map((i, idx) => (
                   <div key={idx} className="flex justify-between">
-                    <span>{i.quantity}x {i.name}</span>
-                    <span className="font-bold">{formatPeso(i.price * i.quantity)}</span>
+                    <span>{i.soldByWeight ? `${formatWeight(i.quantity)} ${i.name}` : `${i.quantity}x ${i.name}`}</span>
+                    <span className="font-bold">{formatPeso(lineTotal(i))}</span>
                   </div>
                 ))}
               </div>
@@ -844,6 +920,17 @@ export function CashierScreen() {
             </div>
           </div>
         )}
+
+        {/* Weight keypad for crops sold by the kilo */}
+        {weighing && (
+          <WeightPanel
+            product={weighing}
+            initialWeight={editingCartLine ? items.find(i => i.cartId === editingCartLine)?.quantity : undefined}
+            initialPricePerKg={editingCartLine ? items.find(i => i.cartId === editingCartLine)?.price : undefined}
+            onCancel={() => { setWeighing(null); setEditingCartLine(null); }}
+            onAdd={handleWeighed}
+          />
+        )}
       </div>
     );
   }
@@ -909,27 +996,41 @@ export function CashierScreen() {
             <div key={item.cartId} className="bg-white p-4 rounded-xl shadow-sm flex items-center gap-4">
               <div className="flex-1">
                 <p className="font-semibold text-slate-900">{item.name}</p>
-                <p className="text-xs text-slate-500">{formatPeso(item.price)} each</p>
+                <p className="text-xs text-slate-500">
+                  {item.soldByWeight
+                    ? `${formatWeight(item.quantity)} × ${formatPeso(item.price)}/kg`
+                    : `${formatPeso(item.price)} each`}
+                </p>
               </div>
-              <div className="flex items-center gap-2">
+              {item.soldByWeight ? (
                 <button
-                  onClick={() => updateQuantity(item.cartId, item.quantity - 1)}
-                  aria-label={`Decrease ${item.name} quantity`}
-                  className="w-11 h-11 bg-slate-100 rounded-lg text-lg font-bold"
+                  onClick={() => openEditWeigh(item)}
+                  aria-label={`Change weight for ${item.name}`}
+                  className="px-3 py-2 bg-amber-50 border border-amber-200 text-amber-800 text-sm font-bold rounded-lg min-h-[44px]"
                 >
-                  −
+                  {formatWeight(item.quantity)}
                 </button>
-                <span className="w-8 text-center font-bold">{item.quantity}</span>
-                <button
-                  onClick={() => updateQuantity(item.cartId, item.quantity + 1)}
-                  aria-label={`Increase ${item.name} quantity`}
-                  className="w-11 h-11 bg-slate-100 rounded-lg text-lg font-bold"
-                >
-                  +
-                </button>
-              </div>
+              ) : (
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => updateQuantity(item.cartId, item.quantity - 1)}
+                    aria-label={`Decrease ${item.name} quantity`}
+                    className="w-11 h-11 bg-slate-100 rounded-lg text-lg font-bold"
+                  >
+                    −
+                  </button>
+                  <span className="w-8 text-center font-bold">{item.quantity}</span>
+                  <button
+                    onClick={() => updateQuantity(item.cartId, item.quantity + 1)}
+                    aria-label={`Increase ${item.name} quantity`}
+                    className="w-11 h-11 bg-slate-100 rounded-lg text-lg font-bold"
+                  >
+                    +
+                  </button>
+                </div>
+              )}
               <div className="text-right">
-                <p className="font-bold">{formatPeso(item.price * item.quantity)}</p>
+                <p className="font-bold">{formatPeso(lineTotal(item))}</p>
                 <button
                   onClick={() => removeItem(item.cartId)}
                   className="text-xs text-red-700 hover:underline"
@@ -942,9 +1043,29 @@ export function CashierScreen() {
         )}
       </div>
 
-      {/* QuickTap Grid - make flex-1 to fill space, add pb-24 to prevent overlap with fixed footer */}
-      <div className="flex-1 overflow-hidden pb-24">
-        <QuickTapGrid products={products} onProductsUpdated={() => getAllProducts().then(setProducts)} />
+      {/* QuickTap / Crops grid - make flex-1 to fill space, add pb-24 to prevent overlap with fixed footer */}
+      <div className="flex-1 overflow-hidden pb-24 flex flex-col">
+        <div className="px-4 pt-3 flex gap-1 bg-white border-b border-slate-200">
+          <button
+            onClick={() => setCashierTab('quicktap')}
+            className={`flex-1 py-2.5 text-xs font-bold rounded-t-lg min-h-[44px] ${cashierTab === 'quicktap' ? 'text-slate-900 border-b-2 border-amber-500' : 'text-slate-400'}`}
+          >
+            ⚡ QuickTap
+          </button>
+          <button
+            onClick={() => setCashierTab('crops')}
+            className={`flex-1 py-2.5 text-xs font-bold rounded-t-lg min-h-[44px] ${cashierTab === 'crops' ? 'text-slate-900 border-b-2 border-amber-500' : 'text-slate-400'}`}
+          >
+            🌾 Crops & Feed
+          </button>
+        </div>
+        <div className="flex-1 overflow-y-auto p-2">
+          {cashierTab === 'quicktap' ? (
+            <QuickTapGrid products={products} onProductsUpdated={() => getAllProducts().then(setProducts)} onWeightProduct={openWeigh} />
+          ) : (
+            <CropsGrid products={products} onPick={openWeigh} />
+          )}
+        </div>
       </div>
 
       {/* Checkout Footer */}
@@ -1187,8 +1308,8 @@ export function CashierScreen() {
             <div className="space-y-2 max-h-48 overflow-y-auto text-sm">
               {receipt.items.map((i, idx) => (
                 <div key={idx} className="flex justify-between">
-                  <span>{i.quantity}x {i.name}</span>
-                  <span className="font-bold">{formatPeso(i.price * i.quantity)}</span>
+                  <span>{i.soldByWeight ? `${formatWeight(i.quantity)} ${i.name}` : `${i.quantity}x ${i.name}`}</span>
+                  <span className="font-bold">{formatPeso(lineTotal(i))}</span>
                 </div>
               ))}
             </div>
@@ -1309,6 +1430,17 @@ export function CashierScreen() {
         <div className="fixed bottom-20 left-1/2 -translate-x-1/2 z-50 bg-slate-900 text-white px-6 py-3 rounded-2xl shadow-xl text-sm font-semibold">
           {toast}
         </div>
+      )}
+
+      {/* Weight keypad for crops sold by the kilo */}
+      {weighing && (
+        <WeightPanel
+          product={weighing}
+          initialWeight={editingCartLine ? items.find(i => i.cartId === editingCartLine)?.quantity : undefined}
+          initialPricePerKg={editingCartLine ? items.find(i => i.cartId === editingCartLine)?.price : undefined}
+          onCancel={() => { setWeighing(null); setEditingCartLine(null); }}
+          onAdd={handleWeighed}
+        />
       )}
     </div>
   );

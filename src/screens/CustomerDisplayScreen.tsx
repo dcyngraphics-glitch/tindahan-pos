@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useCartStore } from '../stores/cartStore';
-import { formatPeso } from '../services/db';
+import { formatPeso, lineTotal, formatWeight } from '../services/db';
 
 // Read store name directly from localStorage — this screen may run in a separate tab
 function getStoreName(): string {
@@ -62,9 +62,9 @@ export function CustomerDisplay() {
           <div key={item.cartId} className="flex justify-between items-center bg-slate-800 p-6 rounded-2xl text-xl">
             <div>
               <p className="font-semibold">{item.name}</p>
-              <p className="text-sm text-slate-400">{item.quantity}x {formatPeso(item.price)}</p>
+              <p className="text-sm text-slate-400">{item.soldByWeight ? `${formatWeight(item.quantity)} ${formatPeso(item.price)}/kg` : `${item.quantity}x ${formatPeso(item.price)}`}</p>
             </div>
-            <p className="font-bold text-amber-400">{formatPeso(item.price * item.quantity)}</p>
+            <p className="font-bold text-amber-400">{formatPeso(lineTotal(item))}</p>
           </div>
         ))}
       </div>

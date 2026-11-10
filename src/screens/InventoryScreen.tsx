@@ -92,7 +92,7 @@ export function InventoryScreen() {
 
   useBarcodeScannerListener(handleScan);
 
-  const handleSave = async (data: { barcode: string; name: string; price: number; cost: number; stock: number; category?: string }) => {
+  const handleSave = async (data: { barcode: string; name: string; price: number; cost: number; stock: number; category?: string; isQuickTap?: boolean; soldByWeight?: boolean }) => {
     if (editingProduct && editingProduct.id) {
       await updateProduct(editingProduct.id, data);
     } else {

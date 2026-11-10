@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { TransactionItem } from '../services/db';
+import { lineTotal, type TransactionItem } from '../services/db';
 
 interface CartItem extends TransactionItem {
   cartId: string;
@@ -14,6 +14,8 @@ interface CartState {
   addItem: (item: TransactionItem & { availableStock?: number }) => void;
   removeItem: (cartId: string) => void;
   updateQuantity: (cartId: string, quantity: number) => void;
+  /** Re-weighing a crop line changes both the weight and possibly the price. */
+  updateItem: (cartId: string, patch: { quantity?: number; price?: number }) => void;
   clearCart: () => void;
   getTotal: () => number;
   getDiscountedTotal: () => number;
@@ -83,7 +85,12 @@ export const useCartStore = create<CartState>((set, get) => {
 
     addItem: (item) => {
       const { availableStock, ...itemData } = item;
-      const existing = get().items.find(i => i.productId === itemData.productId);
+      const quantity = itemData.quantity ?? 1;
+      // Weight-sold items are never merged: each weighing is its own line, so a
+      // customer buying two separate lots of rice gets two readable lines.
+      const existing = itemData.soldByWeight
+        ? undefined
+        : get().items.find(i => i.productId === itemData.productId);
 
       if (existing) {
         if (existing.availableStock !== undefined && existing.quantity + 1 > existing.availableStock) {
@@ -98,13 +105,13 @@ export const useCartStore = create<CartState>((set, get) => {
           ),
         }));
       } else {
-        if (availableStock !== undefined && 1 > availableStock) {
+        if (availableStock !== undefined && quantity > availableStock) {
           window.dispatchEvent(new CustomEvent('tindahan-toast', { detail: 'Cannot add. Item is out of stock.' }));
           return;
         }
         const cartId = `cart-${++cartIdCounter}-${Date.now()}`;
         persistAndSet(state => ({
-          items: [...state.items, { ...itemData, quantity: 1, cartId, availableStock }],
+          items: [...state.items, { ...itemData, quantity, cartId, availableStock }],
         }));
       }
     },
@@ -132,6 +139,18 @@ export const useCartStore = create<CartState>((set, get) => {
       }));
     },
 
+    updateItem: (cartId, patch) => {
+      if (patch.quantity !== undefined && patch.quantity <= 0) {
+        get().removeItem(cartId);
+        return;
+      }
+      persistAndSet(state => ({
+        items: state.items.map(i =>
+          i.cartId === cartId ? { ...i, ...patch } : i
+        ),
+      }));
+    },
+
     discount: null,
 
     setDiscount: (d) => set({ discount: d }),
@@ -142,7 +161,7 @@ export const useCartStore = create<CartState>((set, get) => {
     },
 
     getTotal: () => {
-      return get().items.reduce((sum, item) => sum + item.price * item.quantity, 0);
+      return get().items.reduce((sum, item) => sum + lineTotal(item), 0);
     },
 
     getDiscountedTotal: () => {
@@ -154,7 +173,9 @@ export const useCartStore = create<CartState>((set, get) => {
     },
 
     getItemCount: () => {
-      return get().items.reduce((sum, item) => sum + item.quantity, 0);
+      // A weighed line counts as one item however many kilos it holds — showing
+      // "1.25 items" would be meaningless at the till.
+      return get().items.reduce((sum, item) => sum + (item.soldByWeight ? 1 : item.quantity), 0);
     },
   };
 });

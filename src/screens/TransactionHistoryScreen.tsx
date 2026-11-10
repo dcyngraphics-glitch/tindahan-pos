@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { getAllTransactions, voidTransaction } from '../services/transactions';
 import { printViaBluetooth } from '../services/printer';
-import { formatPeso, type Transaction } from '../services/db';
+import { formatPeso, lineTotal, formatWeight, type Transaction } from '../services/db';
 
 const PAGE_SIZE = 50;
 
@@ -185,7 +185,7 @@ export function TransactionHistoryScreen() {
                           )}
                         </div>
                         <p className="text-xs text-slate-400">
-                          {dateStr} · {tx.items.reduce((sum, i) => sum + i.quantity, 0)} items
+                          {dateStr} · {tx.items.reduce((sum, i) => sum + (i.soldByWeight ? 1 : i.quantity), 0)} items
                         </p>
                       </div>
                     </div>
@@ -221,10 +221,10 @@ export function TransactionHistoryScreen() {
                         {tx.items.map((item, idx) => (
                           <div key={idx} className="flex justify-between text-xs text-slate-700">
                             <span>
-                              {item.quantity}x {item.name}
+                              {item.soldByWeight ? `${formatWeight(item.quantity)} ${item.name}` : `${item.quantity}x ${item.name}`}
                             </span>
                             <span className="font-medium text-slate-900">
-                              {formatPeso(item.price * item.quantity)}
+                              {formatPeso(lineTotal(item))}
                             </span>
                           </div>
                         ))}

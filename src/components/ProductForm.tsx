@@ -14,7 +14,7 @@ function parseToCentavos(value: string): number {
 interface ProductFormProps {
   initial?: Product;
   barcode: string;
-  onSave: (data: { barcode: string; name: string; price: number; cost: number; stock: number; category?: string; isQuickTap?: boolean }) => void | Promise<void>;
+  onSave: (data: { barcode: string; name: string; price: number; cost: number; stock: number; category?: string; isQuickTap?: boolean; soldByWeight?: boolean }) => void | Promise<void>;
   onCancel: () => void;
   inline?: boolean; // when true: renders flat (no modal overlay) for tablet right-pane
 }
@@ -46,6 +46,7 @@ function FormBody({
   const [stock, setStock] = useState(initial?.stock.toString() || '0');
   const [category, setCategory] = useState(initial?.category || '');
   const [isQuickTap, setIsQuickTap] = useState(initial?.isQuickTap || false);
+  const [soldByWeight, setSoldByWeight] = useState(initial?.soldByWeight || false);
   const [errors, setErrors] = useState<FieldErrors>({});
   const [saveError, setSaveError] = useState('');
 
@@ -59,8 +60,10 @@ function FormBody({
   const validate = (): FieldErrors => {
     const next: FieldErrors = {};
     if (!name.trim()) next.name = 'Product name is required.';
-    if (!price.trim()) next.price = 'Selling price is required.';
-    else if (priceCents <= 0) next.price = 'Selling price must be greater than ₱0.00.';
+    if (!price.trim()) next.price = soldByWeight ? 'Price per kilo is required.' : 'Selling price is required.';
+    else if (priceCents <= 0) next.price = soldByWeight ? 'Price per kilo must be greater than ₱0.00.' : 'Selling price must be greater than ₱0.00.';
+    // Stock is not tracked for crops sold by weight.
+    if (soldByWeight) return next;
     if (stock.trim() === '' || isNaN(stockValue)) next.stock = 'Stock is required.';
     else if (stockValue < 0) next.stock = 'Stock cannot be negative.';
     return next;
@@ -79,9 +82,10 @@ function FormBody({
         name: name.trim(),
         price: priceCents,
         cost: parseToCentavos(cost),
-        stock: stockValue,
+        stock: soldByWeight ? 0 : stockValue,
         category: category.trim() || undefined,
         isQuickTap,
+        soldByWeight,
       });
     } catch (err: any) {
       // addProduct() rejects on a duplicate barcode; surface it instead of
@@ -132,7 +136,7 @@ function FormBody({
         <div className="grid grid-cols-2 gap-4">
           <div>
             <label htmlFor="product-price" className="block text-sm font-medium text-slate-700 mb-1">
-              Selling Price *
+              {soldByWeight ? 'Price per kilo *' : 'Selling Price *'}
             </label>
             <div className="relative">
               <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 font-medium">₱</span>
@@ -172,36 +176,67 @@ function FormBody({
         </div>
 
         <div className="grid grid-cols-2 gap-4">
-          <div>
-            <label htmlFor="product-stock" className="block text-sm font-medium text-slate-700 mb-1">
-              Stock *
-            </label>
-            <input
-              id="product-stock"
-              type="number"
-              min="0"
-              value={stock}
-              onChange={(e) => setStock(e.target.value)}
-              className={inputClass}
-              placeholder="0"
-              aria-invalid={stockInvalid}
-              aria-describedby={stockInvalid ? 'product-stock-error' : undefined}
-            />
-            <FieldError id="product-stock-error" message={errors.stock} />
-          </div>
-          <div>
-            <label htmlFor="product-category" className="block text-sm font-medium text-slate-700 mb-1">
-              Category
-            </label>
-            <input
-              id="product-category"
-              type="text"
-              value={category}
-              onChange={(e) => setCategory(e.target.value)}
-              className={inputClass}
-              placeholder="e.g. Noodles"
-            />
-          </div>
+          {soldByWeight ? (
+            <div className="col-span-2">
+              <label htmlFor="product-category" className="block text-sm font-medium text-slate-700 mb-1">
+                Category
+              </label>
+              <input
+                id="product-category"
+                type="text"
+                value={category}
+                onChange={(e) => setCategory(e.target.value)}
+                className={inputClass}
+                placeholder="e.g. Crops"
+              />
+            </div>
+          ) : (
+            <>
+              <div>
+                <label htmlFor="product-stock" className="block text-sm font-medium text-slate-700 mb-1">
+                  Stock *
+                </label>
+                <input
+                  id="product-stock"
+                  type="number"
+                  min="0"
+                  value={stock}
+                  onChange={(e) => setStock(e.target.value)}
+                  className={inputClass}
+                  placeholder="0"
+                  aria-invalid={stockInvalid}
+                  aria-describedby={stockInvalid ? 'product-stock-error' : undefined}
+                />
+                <FieldError id="product-stock-error" message={errors.stock} />
+              </div>
+              <div>
+                <label htmlFor="product-category" className="block text-sm font-medium text-slate-700 mb-1">
+                  Category
+                </label>
+                <input
+                  id="product-category"
+                  type="text"
+                  value={category}
+                  onChange={(e) => setCategory(e.target.value)}
+                  className={inputClass}
+                  placeholder="e.g. Noodles"
+                />
+              </div>
+            </>
+          )}
+        </div>
+
+        <div className="flex items-center gap-3 p-3 bg-emerald-50 border border-emerald-200 rounded-xl">
+          <input
+            type="checkbox"
+            id="soldByWeight"
+            checked={soldByWeight}
+            onChange={(e) => setSoldByWeight(e.target.checked)}
+            className="w-5 h-5 text-emerald-600 rounded border-slate-300 focus:ring-emerald-500"
+          />
+          <label htmlFor="soldByWeight" className="text-sm font-medium text-slate-800 cursor-pointer">
+            Sold by weight <span className="block text-xs text-slate-500">Rice, animal feed and other crops priced per kilo. Stock is not tracked.</span>
+          </label>
         </div>
 
         <div className="flex items-center gap-3 p-3 bg-amber-50 border border-amber-200 rounded-xl">

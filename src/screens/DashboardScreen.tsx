@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback, useMemo } from 'react';
 import { getAllTransactions } from '../services/transactions';
 import { getAllProducts } from '../services/products';
-import { formatPeso, type Transaction, type Product } from '../services/db';
+import { formatPeso, lineTotal, formatWeight, type Transaction, type Product } from '../services/db';
 import { getOutstandingTotal } from '../services/utang';
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid, AreaChart, Area } from 'recharts';
 
@@ -127,7 +127,7 @@ export function DashboardScreen() {
           map[item.productId] = { name: item.name, qty: 0, rev: 0 };
         }
         map[item.productId].qty += item.quantity;
-        map[item.productId].rev += (item.price * item.quantity) / 100;
+        map[item.productId].rev += lineTotal(item) / 100;
       }
     }
     return Object.values(map)
@@ -147,8 +147,8 @@ export function DashboardScreen() {
       const dateStr = new Date(t.createdAt).toLocaleString('en-PH');
       const status = t.voided ? 'VOIDED' : 'COMPLETED';
       const totalPhp = (t.total / 100).toFixed(2);
-      const itemsCount = t.items.reduce((s, i) => s + i.quantity, 0);
-      const itemsDetail = t.items.map(i => `${i.quantity}x ${i.name} (P${(i.price / 100).toFixed(2)})`).join('; ');
+      const itemsCount = t.items.reduce((s, i) => s + (i.soldByWeight ? 1 : i.quantity), 0);
+      const itemsDetail = t.items.map(i => `${i.soldByWeight ? formatWeight(i.quantity) : `${i.quantity}x`} ${i.name} (P${(i.price / 100).toFixed(2)})`).join('; ');
 
       return [
         `"${t.id}"`,

@@ -11,6 +11,12 @@ export interface Product {
   category?: string;
   image?: string;
   isQuickTap?: boolean;
+  /**
+   * Crops (rice, animal feed) are sold by weight rather than by the piece.
+   * When this is set, `price` is the price PER KILO and `stock` is ignored —
+   * the store does not track bulk stock by weight.
+   */
+  soldByWeight?: boolean;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -21,6 +27,29 @@ export interface TransactionItem {
   name: string;
   price: number;
   quantity: number;
+  /**
+   * Set on lines sold by weight. `quantity` then holds the weight in kilograms
+   * (a decimal) and `price` is the price per kilo, so the line total is still
+   * price x quantity — the same formula as a normal line.
+   */
+  soldByWeight?: boolean;
+}
+
+/**
+ * Line total in centavos.
+ *
+ * Weight-sold items are rounded to the nearest peso (100 centavos) per line:
+ * 0.83 kg of rice at 52.00/kg is 43.16, which the store charges as 43.00.
+ * Everything else is charged to the centavo as before.
+ */
+export function lineTotal(item: Pick<TransactionItem, 'price' | 'quantity' | 'soldByWeight'>): number {
+  const raw = item.price * item.quantity;
+  return item.soldByWeight ? Math.round(raw / 100) * 100 : raw;
+}
+
+/** Weight in kilograms formatted for display, e.g. 1.25 -> "1.25 kg". */
+export function formatWeight(quantity: number): string {
+  return `${quantity.toFixed(2).replace(/\.?0+$/, '')} kg`;
 }
 
 export interface Transaction {
