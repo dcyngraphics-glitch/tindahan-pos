@@ -75,7 +75,7 @@ export function ScannerScreen() {
   const isFormOpen = !!(scannedBarcode || editingProduct);
 
   return (
-    <div className="flex-1 flex flex-col bg-slate-50 relative overflow-y-auto pb-24">
+      <div className="flex-1 flex flex-col bg-slate-50 relative">
 
       {successMessage && (
         <div className="m-4 p-4 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-2xl font-bold flex items-center justify-between shadow-sm">
@@ -86,11 +86,13 @@ export function ScannerScreen() {
 
       <div className="p-4 space-y-4 max-w-lg mx-auto w-full">
         {/* Camera Viewfinder (Inline on Scanner Tab) */}
-        <div className="bg-slate-900 rounded-3xl overflow-hidden shadow-md border border-slate-800 relative h-72 flex flex-col items-center justify-center">
-          <BarcodeScanner
-            onScan={handleScan}
-          />
-        </div>
+                <div className="flex-1 min-h-0 flex flex-col items-center justify-center p-4">
+                  <div className="w-full flex-1 max-w-lg bg-slate-900 rounded-3xl overflow-hidden shadow-md border border-slate-800 relative flex flex-col items-center justify-center">
+                    <BarcodeScanner
+                      onScan={handleScan}
+                    />
+                  </div>
+                </div>
 
         {/* Manual Lookup & Recent Scans */}
         <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-200 space-y-4">
