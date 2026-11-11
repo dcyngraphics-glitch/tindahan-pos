@@ -67,12 +67,12 @@ function asDate(value: unknown): Date {
 
 export async function restoreBackup(raw: unknown): Promise<Record<string, number>> {
   if (!raw || typeof raw !== 'object') {
-    throw new Error('That file is not a Tindahan POS backup.');
+    throw new Error('That file is not a Softies Store backup.');
   }
   const file = raw as Partial<BackupFile>;
 
   if (file.format !== BACKUP_FORMAT) {
-    throw new Error('That file is not a Tindahan POS backup.');
+    throw new Error('That file is not a Softies Store backup.');
   }
   if (file.version !== BACKUP_VERSION) {
     throw new Error('That backup was made by a different version of the app.');

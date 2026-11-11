@@ -73,7 +73,7 @@ test('L-1  Cashier logout (tablet)', async ({ page }) => {
   await page.click('button:has-text("Log Out")');
   await expect(page.locator('h3:has-text("Log Out?")')).toBeVisible();
   await page.click('button:has-text("Log Out")');
-  await expect(page.locator('h1:has-text("Tindahan ni Aling Puring")')).toBeVisible();
+  await expect(page.locator('h1:has-text("Softies Store")')).toBeVisible();
   console.log('  L1 logout OK -> back to login');
 });
 
@@ -88,6 +88,6 @@ test('L-2  Logout from Dev Settings modal (tablet)', async ({ page }) => {
   await page.click('button:has-text("Log Out 🚪")');
   await expect(page.locator('h3:has-text("Log Out?")')).toBeVisible();
   await page.click('button:has-text("Log Out")');
-  await expect(page.locator('h1:has-text("Tindahan ni Aling Puring")')).toBeVisible();
+  await expect(page.locator('h1:has-text("Softies Store")')).toBeVisible();
   console.log('  L2 logout from Dev Settings OK -> back to login');
 });

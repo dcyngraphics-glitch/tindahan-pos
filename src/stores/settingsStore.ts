@@ -14,7 +14,7 @@ interface SettingsState {
 }
 
 const DEFAULT_RECEIPT: ReceiptConfig = {
-  storeName: 'Tindahan ni Aling Puring',
+  storeName: 'Softies Store',
   storeAddress: '123 Mabini St., Barangay San Jose',
   contactInfo: 'Tel: 0912-345-6789',
   receiptHeader: 'Sari-Sari Store Official Receipt',

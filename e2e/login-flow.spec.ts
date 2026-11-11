@@ -19,7 +19,7 @@ test.describe('Login Flow Verification', () => {
   });
 
   test('TC-1: role selection + Sign In reaches the emailed OTP step', async ({ page }) => {
-    await expect(page.locator('h1:has-text("Tindahan ni Aling Puring")')).toBeVisible();
+    await expect(page.locator('h1:has-text("Softies Store")')).toBeVisible();
 
     await page.click('button:has-text("Cashier")');
     await page.click('button:has-text("Sign In")');
@@ -50,7 +50,7 @@ test.describe('Login Flow Verification', () => {
 
     await page.click('button:has-text("Cancel")');
 
-    await expect(page.locator('h1:has-text("Tindahan ni Aling Puring")')).toBeVisible();
+    await expect(page.locator('h1:has-text("Softies Store")')).toBeVisible();
     await expect(page.locator('button:has-text("Sign In")')).toBeVisible();
   });
 

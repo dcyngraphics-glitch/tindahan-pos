@@ -43,7 +43,7 @@ export function LoginScreen() {
           <div className="w-16 h-16 bg-amber-100 text-amber-600 rounded-2xl mx-auto flex items-center justify-center text-3xl font-extrabold shadow-inner mb-4">
             🏪
           </div>
-          <h1 className="text-2xl font-black text-slate-900">Tindahan ni Aling Puring</h1>
+          <h1 className="text-2xl font-black text-slate-900">Softies Store</h1>
           <p className="text-slate-500 text-sm mt-1">Smart Sari-Sari POS & Inventory System</p>
         </div>
 

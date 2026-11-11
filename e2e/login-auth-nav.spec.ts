@@ -49,7 +49,7 @@ test.describe('Login & Auth & Navigation Flow', () => {
   });
 
   test('C-2  Login screen offers both roles and no PIN', async ({ page }) => {
-    await expect(page.locator('h1:has-text("Tindahan ni Aling Puring")')).toBeVisible();
+    await expect(page.locator('h1:has-text("Softies Store")')).toBeVisible();
     await expect(page.locator('button:has-text("Cashier")')).toBeVisible();
     await expect(page.locator('button:has-text("Inventory Staff")')).toBeVisible();
     await expect(page.locator('button:has-text("Sign In")')).toBeVisible();
@@ -66,7 +66,7 @@ test.describe('Login & Auth & Navigation Flow', () => {
 
   test('C-4  Auto-login from a persisted session (no login screen)', async ({ page }) => {
     await signIn(page, 'cashier');
-    await expect(page.locator('h1:has-text("Tindahan ni Aling Puring")')).not.toBeVisible();
+    await expect(page.locator('h1:has-text("Softies Store")')).not.toBeVisible();
     await expect(page.locator('h1:has-text("Cashier POS")')).toBeVisible();
   });
 
@@ -177,7 +177,7 @@ test.describe('Login & Auth & Navigation Flow', () => {
     await expect(page.locator('h3:has-text("Log Out?")')).toBeVisible();
     await page.click('div[role="dialog"] button:has-text("Log Out")');
 
-    await expect(page.locator('h1:has-text("Tindahan ni Aling Puring")')).toBeVisible();
+    await expect(page.locator('h1:has-text("Softies Store")')).toBeVisible();
     const auth = await page.evaluate(() => localStorage.getItem('tindahan_auth'));
     expect(auth).toBeNull();
   });
@@ -190,7 +190,7 @@ test.describe('Login & Auth & Navigation Flow', () => {
 
     await page.click('button:has-text("Log Out 🚪")');
 
-    await expect(page.locator('h1:has-text("Tindahan ni Aling Puring")')).toBeVisible();
+    await expect(page.locator('h1:has-text("Softies Store")')).toBeVisible();
     const auth = await page.evaluate(() => localStorage.getItem('tindahan_auth'));
     expect(auth).toBeNull();
   });
@@ -198,6 +198,6 @@ test.describe('Login & Auth & Navigation Flow', () => {
   test('L-3  Header logout returns to the login screen', async ({ page }) => {
     await signIn(page, 'cashier');
     await page.click('header button:has-text("Logout")');
-    await expect(page.locator('h1:has-text("Tindahan ni Aling Puring")')).toBeVisible();
+    await expect(page.locator('h1:has-text("Softies Store")')).toBeVisible();
   });
 });

@@ -6,11 +6,11 @@ import { formatPeso, lineTotal, formatWeight } from '../services/db';
 function getStoreName(): string {
   try {
     const raw = localStorage.getItem('tindahan_receipt_config');
-    if (!raw) return 'Tindahan ni Aling Puring';
+    if (!raw) return 'Softies Store';
     const parsed = JSON.parse(raw);
     if (parsed && typeof parsed.storeName === 'string') return parsed.storeName;
   } catch { /* ignore */ }
-  return 'Tindahan ni Aling Puring';
+  return 'Softies Store';
 }
 
 /**

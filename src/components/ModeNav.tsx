@@ -60,7 +60,7 @@ export function ModeNav({ isOpen, onClose, lowStockCount = 0 }: ModeNavProps) {
           <div className="flex items-center gap-2 min-w-0">
             <span className="text-xl shrink-0">🏪</span>
             <div className="min-w-0">
-              <span className="font-extrabold text-slate-800">Tindahan POS</span>
+              <span className="font-extrabold text-slate-800">Softies Store</span>
               {accountEmail && (
                 <div className="text-xs text-slate-500 truncate max-w-[180px]" title={accountEmail}>
                   ✉ {accountEmail}

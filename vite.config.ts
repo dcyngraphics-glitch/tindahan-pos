@@ -64,8 +64,8 @@ export default defineConfig({
       registerType: 'autoUpdate',
       includeAssets: ['favicon.svg', 'icon-192.svg', 'icons.svg'],
       manifest: {
-        name: 'Tindahan POS',
-        short_name: 'Tindahan',
+        name: 'Softies Store',
+        short_name: 'Softies Store',
         description: 'Barcode scanner POS for small stores',
         start_url: base,
         scope: base,

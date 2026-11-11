@@ -91,9 +91,9 @@ describe('backup', () => {
     expect(tx?.paymentType).toBe('utang');
   });
 
-  it('rejects a file that is not a Tindahan POS backup', async () => {
-    await expect(restoreBackup({ hello: 'world' })).rejects.toThrow(/not a Tindahan POS backup/i);
-    await expect(restoreBackup(null)).rejects.toThrow(/not a Tindahan POS backup/i);
+  it('rejects a file that is not a Softies Store backup', async () => {
+    await expect(restoreBackup({ hello: 'world' })).rejects.toThrow(/not a Softies Store backup/i);
+    await expect(restoreBackup(null)).rejects.toThrow(/not a Softies Store backup/i);
   });
 
   it('rejects a backup from a different version', async () => {
