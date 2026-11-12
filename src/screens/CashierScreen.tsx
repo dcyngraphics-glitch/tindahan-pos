@@ -232,6 +232,28 @@ export function CashierScreen() {
       checkoutOpenedRef.current = false;
     }
   }, [checkoutOpen]);
+
+  // Receipt modal entrance: the slip rises and settles with the same overshoot
+  // as the checkout panel, so it never snaps into place.
+  useGSAP(() => {
+    if (receipt && !receiptOpenedRef.current) {
+      receiptOpenedRef.current = true;
+      const card = receiptCardRef.current;
+      if (card) {
+        gsap.from(card, {
+          y: 24,
+          autoAlpha: 0,
+          scale: 0.96,
+          duration: MOTION.entrance,
+          ease: MOTION.easeOutBack,
+          clearProps: "transform",
+        });
+      }
+    } else if (!receipt) {
+      receiptOpenedRef.current = false;
+    }
+  }, [receipt]);
+
   const showToast = useCallback((msg: string) => {
     setToast(msg);
     setTimeout(() => setToast(null), 2500);
