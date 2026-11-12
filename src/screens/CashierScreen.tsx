@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useCartStore } from '../stores/cartStore';
 import { getProductByBarcode, getAllProducts, addProduct } from '../services/products';
 import { createTransaction, voidTransaction } from '../services/transactions';
@@ -14,6 +14,7 @@ import { printViaBluetooth } from '../services/printer';
 import { formatPeso, lineTotal, formatWeight, seedCatalogIfEmpty, SARI_SARI_SEED, type TransactionItem, type Product, type Customer } from '../services/db';
 import { getAllCustomers, addCustomer } from '../services/customers';
 import { useCloudSession } from '../hooks/useCloudSession';
+import { useGSAP, gsap, MOTION } from "../lib/motion";
 
 // React Compiler false positive: this only runs from event handlers, never during render.
 const receiptDate = () => new Date();
@@ -158,6 +159,79 @@ export function CashierScreen() {
 
   const [toast, setToast] = useState<string | null>(null);
 
+  const cartListRef = useRef<HTMLDivElement>(null);
+  const handledIds = useRef(new Set<string>());
+  const checkoutCardRef = useRef<HTMLDivElement>(null);
+  const receiptCardRef = useRef<HTMLDivElement>(null);
+  const qtyLastRef = useRef<Map<string, number>>(new Map());
+  const checkoutOpenedRef = useRef(false);
+  const receiptOpenedRef = useRef(false);
+
+  // Cart entrance: any line freshly added slides in from the right, so the
+  // cashier's eye is drawn exactly where the new item landed. High-frequency
+  // (a scan is a sale), so it's short, springy, and runs in parallel with the
+  // state update, never blocking it.
+  useGSAP(() => {
+    const container = cartListRef.current;
+    if (!container) return;
+    // New lines slide in from the right so the cashier's eye lands on exactly
+    // where the item landed. High-frequency (a scan is a sale), so it's short,
+    // springy, and runs in parallel with the state update — never blocking it.
+    for (const item of items) {
+      if (handledIds.current.has(item.cartId)) continue;
+      handledIds.current.add(item.cartId);
+      const row = container.querySelector(`[data-cart-id="${item.cartId}"]`);
+      if (!row) continue;
+      gsap.from(row, {
+        x: 24,
+        autoAlpha: 0,
+        duration: MOTION.entrance,
+        ease: MOTION.easeOutBack,
+        clearProps: "transform",
+      });
+    }
+    // Quantity edits: quick pop on the number (scan adds are handled above, so
+    // this only fires on +/− or weight-change edits).
+    for (const item of items) {
+      const prev = qtyLastRef.current.get(item.cartId);
+      if (prev !== undefined && prev !== item.quantity) {
+        const row = container.querySelector(`[data-cart-id="${item.cartId}"]`);
+        if (!row) continue;
+        const qtySpan = row.querySelector('[data-qty]');
+        if (qtySpan) {
+          gsap.to(qtySpan as HTMLElement, {
+            scale: 1.25,
+            yoyo: true,
+            duration: 0.16,
+            ease: MOTION.easeOut,
+            clearProps: "transform",
+          });
+        }
+      }
+      qtyLastRef.current.set(item.cartId, item.quantity);
+    }
+  }, [items]);
+
+  // Checkout modal entrance: the whole panel slides up and fades in with a
+  // slight overshoot, so the wrap never just "pops" into existence.
+  useGSAP(() => {
+    if (checkoutOpen && !checkoutOpenedRef.current) {
+      checkoutOpenedRef.current = true;
+      const card = checkoutCardRef.current;
+      if (card) {
+        gsap.from(card, {
+          y: 24,
+          autoAlpha: 0,
+          scale: 0.96,
+          duration: MOTION.entrance,
+          ease: MOTION.easeOutBack,
+          clearProps: "transform",
+        });
+      }
+    } else if (!checkoutOpen) {
+      checkoutOpenedRef.current = false;
+    }
+  }, [checkoutOpen]);
   const showToast = useCallback((msg: string) => {
     setToast(msg);
     setTimeout(() => setToast(null), 2500);
@@ -475,7 +549,7 @@ export function CashierScreen() {
 
           {/* The cart list scrolls on its own; the checkout footer below it is a
               plain flex child, so it stays pinned to the bottom of the pane. */}
-          <div className="flex-1 min-h-0 overflow-y-auto p-4 space-y-3 bg-slate-50">
+          <div className="flex-1 min-h-0 overflow-y-auto p-4 space-y-3 bg-slate-50" ref={cartListRef}>
               {items.length === 0 ? (
                 <div className="text-center py-16 text-slate-400">
                   <p className="text-5xl mb-4">🛒</p>
@@ -484,7 +558,7 @@ export function CashierScreen() {
                 </div>
               ) : (
                 items.map((item) => (
-                  <div key={item.cartId} className="bg-white p-4 rounded-xl shadow-sm flex items-center gap-4 border border-slate-100">
+                  <div key={item.cartId} data-cart-id={item.cartId} className="bg-white p-4 rounded-xl shadow-sm flex items-center gap-4 border border-slate-100">
                     <div className="flex-1 min-w-0">
                       <p className="font-semibold text-slate-900 truncate">{item.name}</p>
                       <p className="text-sm text-slate-500">
@@ -604,7 +678,7 @@ export function CashierScreen() {
         {/* Checkout Modal */}
         {checkoutOpen && (
           <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
-            <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl space-y-6">
+            <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl space-y-6" ref={checkoutCardRef}>
               <div className="flex justify-between items-center border-b pb-4">
                 <h3 className="text-xl font-bold text-slate-900">Process Checkout</h3>
                 <button onClick={closeCheckout} aria-label="Close checkout" className="w-11 h-11 rounded-full bg-slate-100 flex items-center justify-center font-bold">✕</button>
@@ -826,7 +900,7 @@ export function CashierScreen() {
         {/* Receipt Modal */}
         {receipt && (
           <div className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4">
-            <div className="printable-receipt bg-white rounded-3xl max-w-md w-full p-8 shadow-2xl space-y-6">
+            <div className="printable-receipt bg-white rounded-3xl max-w-md w-full p-8 shadow-2xl space-y-6" ref={receiptCardRef}>
               <div className="text-center border-b pb-4">
                 <p className="text-4xl mb-2">🎉</p>
                 <h3 className="text-2xl font-black text-slate-900">Transaction Complete!</h3>
@@ -989,7 +1063,7 @@ export function CashierScreen() {
       )}
 
       {/* Cart Items - add pb-24 to prevent overlap with fixed footer */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-3 pb-24">
+      <div className="flex-1 overflow-y-auto p-4 space-y-3 pb-24" ref={cartListRef}>
         {items.length === 0 ? (
           <div className="text-center py-16 text-slate-400">
             <p className="text-5xl mb-4">🛒</p>
@@ -997,7 +1071,7 @@ export function CashierScreen() {
           </div>
         ) : (
           items.map((item) => (
-            <div key={item.cartId} className="bg-white p-4 rounded-xl shadow-sm flex items-center gap-4">
+            <div key={item.cartId} data-cart-id={item.cartId} className="bg-white p-4 rounded-xl shadow-sm flex items-center gap-4">
               <div className="flex-1">
                 <p className="font-semibold text-slate-900">{item.name}</p>
                 <p className="text-xs text-slate-500">
@@ -1099,7 +1173,7 @@ export function CashierScreen() {
       {/* Checkout Modal */}
       {checkoutOpen && (
         <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl space-y-6">
+          <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl space-y-6" ref={checkoutCardRef}>
             <div className="flex justify-between items-center border-b pb-4">
               <h3 className="text-xl font-bold text-slate-900">Process Checkout</h3>
               <button onClick={closeCheckout} aria-label="Close checkout" className="w-11 h-11 rounded-full bg-slate-100 flex items-center justify-center font-bold">✕</button>
@@ -1297,7 +1371,7 @@ export function CashierScreen() {
       {/* Receipt Modal */}
       {receipt && (
         <div className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4">
-          <div className="printable-receipt bg-white rounded-3xl max-w-md w-full p-8 shadow-2xl space-y-6">
+          <div className="printable-receipt bg-white rounded-3xl max-w-md w-full p-8 shadow-2xl space-y-6" ref={receiptCardRef}>
             <div className="text-center border-b pb-4">
               <p className="text-4xl mb-2">🎉</p>
               <h3 className="text-2xl font-black text-slate-900">Transaction Complete!</h3>

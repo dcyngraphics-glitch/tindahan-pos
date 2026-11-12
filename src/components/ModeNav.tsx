@@ -1,10 +1,11 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from "react";
 import { useAppStore, type AppMode } from '../stores/appStore';
 import { useAuthStore } from '../stores/authStore';
 import { useAuth } from '../context/AuthContext';
 import { useCloudSession } from '../hooks/useCloudSession';
 import { DeveloperSettingsModal } from './DeveloperSettingsModal';
-import { ConfirmDialog } from './ConfirmDialog';
+import { ConfirmDialog } from "./ConfirmDialog";
+import { useGSAP, registerGsap, MOTION, gsap } from "../lib/motion";
 
 interface ModeNavProps {
   isOpen: boolean;
@@ -37,21 +38,93 @@ export function ModeNav({ isOpen, onClose, lowStockCount = 0 }: ModeNavProps) {
     { id: 'dashboard', label: 'Dashboard', icon: '📊' },
   ];
 
-  const activeModes = role === 'inventory' ? inventoryModes : cashierModes;
+  const activeModes = role === "inventory" ? inventoryModes : cashierModes;
 
-  if (!isOpen) return null;
+  const navRef = useRef<HTMLElement>(null);
+  const backdropRef = useRef<HTMLDivElement>(null);
+  const tweenRef = useRef<gsap.core.Tween | null>(null);
+  const isMountedRef = useRef(false);
+
+  // Register the motion system once per component.
+  useGSAP(() => {
+    registerGsap();
+  });
+
+  // Smooth drawer + backdrop transitions. The nav always stays mounted (it
+  // lives off-screen when closed); GSAP drives the slide + fade so it never
+  // "pops" in/out. We kill the previous tween before starting a new one so a
+  // mid-open drag never overlaps.
+  useGSAP(() => {
+    const nav = navRef.current;
+    const backdrop = backdropRef.current;
+    if (!nav && !backdrop) return;
+
+    // Kill any running tween so we never overlap.
+    tweenRef.current?.kill();
+
+    // First run (mount) just applies the closed position without animating.
+    if (!isMountedRef.current) {
+      if (!isOpen) {
+        gsap.set(nav, { x: "100%", overwrite: "auto" });
+      }
+      isMountedRef.current = true;
+      return;
+    }
+
+    if (isOpen) {
+      // Force off-screen start, then slide in (prevents a flash when the
+      // drawer re-opens after being closed).
+      gsap.set(nav, { x: "100%", autoAlpha: 0, overwrite: "auto" });
+      tweenRef.current = gsap.to(nav, {
+        x: 0,
+        autoAlpha: 1,
+        duration: MOTION.standard,
+        ease: MOTION.easeOut,
+        overwrite: "auto",
+      });
+    } else {
+      tweenRef.current = gsap.to(nav, {
+        x: "100%",
+        autoAlpha: 0,
+        duration: MOTION.standard,
+        ease: MOTION.easeIn,
+        overwrite: "auto",
+      });
+    }
+
+    // Backdrop follows the drawer — fast fade out on close so nothing blocks
+    // the cashier's next tap (see Atlassian motion guidance: exit faster
+    // than entrance).
+    if (backdrop) {
+      const dur = isOpen ? MOTION.standard : 0.12;
+      const ease = isOpen ? MOTION.easeOut : MOTION.easeNone;
+      tweenRef.current = gsap.to(backdrop, {
+        autoAlpha: isOpen ? 1 : 0,
+        duration: dur,
+        ease,
+        overwrite: "auto",
+      });
+    }
+  }, [isOpen]);
+
+  // Mark mounted so the first run only applies the closed position.
+  useEffect(() => {
+    isMountedRef.current = true;
+  }, []);
 
   return (
     <>
-      {/* Backdrop overlay */}
+      {/* Backdrop overlay — always mounted so GSAP can fade it. */}
       <div
-        className="fixed inset-0 bg-black/50 z-40 transition-opacity"
+        ref={backdropRef}
+        className="fixed inset-0 bg-black/50 z-40"
         onClick={onClose}
         aria-hidden="true"
       />
 
-      {/* Sliding Navigation Drawer */}
+      {/* Sliding Navigation Drawer — always mounted, off-screen when closed. */}
       <nav
+        ref={navRef}
         className="fixed bottom-0 left-0 top-0 h-full bg-white border-r border-slate-200 flex flex-col py-4 px-3 z-50 shadow-2xl w-64 max-w-[85vw]"
         role="navigation"
         aria-label="Main Navigation"
