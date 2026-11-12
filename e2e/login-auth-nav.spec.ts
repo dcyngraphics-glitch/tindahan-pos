@@ -24,9 +24,15 @@ async function signIn(page: Page, role: 'cashier' | 'inventory') {
 
 async function openMenu(page: Page) {
   const nav = page.locator('nav[role="navigation"]');
-  // On mobile the inventory sidebar starts open, and its backdrop covers the menu
-  // button — so only click when the drawer is actually closed.
-  if (!(await nav.isVisible())) {
+  // A drawer that is animating shut still reports visible for most of its 0.34s
+  // exit, so an immediate isVisible() check misreads it as open, skips the open
+  // click, and the following nav-item click then races the closing animation.
+  // Wait out the exit instead; a drawer that stays visible was already open.
+  const finishedClosing = await nav
+    .waitFor({ state: 'hidden', timeout: 2000 })
+    .then(() => true)
+    .catch(() => false);
+  if (finishedClosing) {
     await page.click('button[aria-label="Open menu"]');
   }
   await expect(nav).toBeVisible();

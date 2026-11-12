@@ -57,24 +57,32 @@ export function ModeNav({ isOpen, onClose, lowStockCount = 0 }: ModeNavProps) {
   useGSAP(() => {
     const nav = navRef.current;
     const backdrop = backdropRef.current;
-    if (!nav && !backdrop) return;
+    if (!nav) return;
 
     // Kill any running tween so we never overlap.
     tweenRef.current?.kill();
 
-    // First run (mount) just applies the closed position without animating.
+    // First run: apply the current state instantly instead of animating, so
+    // nothing flashes on screen before the first toggle. This must cover the
+    // backdrop as well — React StrictMode double-invokes effects in dev, which
+    // masked a stuck, fully opaque backdrop in production builds.
     if (!isMountedRef.current) {
-      if (!isOpen) {
-        gsap.set(nav, { x: "100%", overwrite: "auto" });
-      }
       isMountedRef.current = true;
+      gsap.set(nav, {
+        x: isOpen ? 0 : "-100%",
+        autoAlpha: isOpen ? 1 : 0,
+        overwrite: "auto",
+      });
+      if (backdrop) {
+        gsap.set(backdrop, { autoAlpha: isOpen ? 1 : 0, overwrite: "auto" });
+      }
       return;
     }
 
     if (isOpen) {
       // Force off-screen start, then slide in (prevents a flash when the
       // drawer re-opens after being closed).
-      gsap.set(nav, { x: "100%", autoAlpha: 0, overwrite: "auto" });
+      gsap.set(nav, { x: "-100%", autoAlpha: 0, overwrite: "auto" });
       tweenRef.current = gsap.to(nav, {
         x: 0,
         autoAlpha: 1,
@@ -84,7 +92,7 @@ export function ModeNav({ isOpen, onClose, lowStockCount = 0 }: ModeNavProps) {
       });
     } else {
       tweenRef.current = gsap.to(nav, {
-        x: "100%",
+        x: "-100%",
         autoAlpha: 0,
         duration: MOTION.standard,
         ease: MOTION.easeIn,
