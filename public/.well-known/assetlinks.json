@@ -1,0 +1,12 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "com.softiesstore.pos",
+      "sha256_certfingerprints": [
+        "E0:D8:D6:37:07:2C:F2:87:C2:12:09:22:CD:8B:28:78:0E:3A:5F:88:A6:AD:4E:2D:73:31:1E:9D:3F:48:35:50"
+      ]
+    }
+  }
+]
