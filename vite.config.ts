@@ -89,6 +89,10 @@ export default defineConfig({
       },
       workbox: {
         globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2,ttf}'],
+        // Chrome only treats the app as installable when the service worker
+        // responds to fetch events; precacheAndRoute alone registers none.
+        // This also gives client-side routes an offline fallback.
+        navigateFallback: `${base}index.html`,
       },
     }),
   ],
