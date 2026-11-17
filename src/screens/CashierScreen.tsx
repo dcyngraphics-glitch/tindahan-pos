@@ -546,7 +546,7 @@ export function CashierScreen() {
 
           {notFound && (
             <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
-              <div className="bg-white rounded-2xl w-full max-w-md p-6 shadow-2xl">
+              <div className="bg-white rounded-2xl w-full max-w-md p-6 shadow-2xl max-h-[calc(100dvh-2rem)] overflow-y-auto">
                 <div className="mb-4">
                   <h3 className="text-xl font-bold text-slate-800">
                     {seedPrefill ? 'Product Recognised' : 'New Barcode Detected'}
@@ -699,12 +699,20 @@ export function CashierScreen() {
 
         {/* Checkout Modal */}
         {checkoutOpen && (
-          <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
-            <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl space-y-6" ref={checkoutCardRef}>
-              <div className="flex justify-between items-center border-b pb-4">
+          <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-3">
+            <div
+              className="bg-white w-full max-w-md rounded-3xl shadow-2xl flex flex-col max-h-[calc(100dvh-1.5rem)]"
+              ref={checkoutCardRef}
+            >
+              <div className="flex justify-between items-center gap-3 border-b px-6 pt-5 pb-4 shrink-0">
                 <h3 className="text-xl font-bold text-slate-900">Process Checkout</h3>
-                <button onClick={closeCheckout} aria-label="Close checkout" className="w-11 h-11 rounded-full bg-slate-100 flex items-center justify-center font-bold">✕</button>
+                <button onClick={closeCheckout} aria-label="Close checkout" className="w-11 h-11 shrink-0 rounded-full bg-slate-100 flex items-center justify-center font-bold">✕</button>
               </div>
+
+              {/* Scrollable body. The pay button lives in the sticky footer below so it
+                  is always on screen — on short landscape displays (1280x800 tablets)
+                  the form alone is taller than the viewport. */}
+              <div className="flex-1 min-h-0 overflow-y-auto px-6 py-5 space-y-5">
 
               <div>
                 <p className="text-sm text-slate-500 mb-1">Subtotal</p>
@@ -903,18 +911,21 @@ export function CashierScreen() {
               {checkoutError && (
                 <p className="text-sm text-red-600 bg-red-50 rounded-xl p-3">{checkoutError}</p>
               )}
-              
-              <button
-                onClick={handleCheckout}
-                disabled={
-                  paymentType === 'cash'
-                    ? !cashTendered || Math.round(parseFloat(cashTendered) * 100) < total
-                    : !selectedCustomerId
-                }
-                className="w-full py-4 bg-amber-500 hover:bg-amber-600 text-slate-900 font-extrabold text-lg rounded-2xl shadow-lg disabled:opacity-40 transition"
-              >
-                {paymentType === 'cash' ? 'Complete Payment' : 'Record Utang'}
-              </button>
+              </div>
+
+              <div className="px-6 pb-5 pt-2 shrink-0">
+                <button
+                  onClick={handleCheckout}
+                  disabled={
+                    paymentType === 'cash'
+                      ? !cashTendered || Math.round(parseFloat(cashTendered) * 100) < total
+                      : !selectedCustomerId
+                  }
+                  className="w-full min-h-[52px] py-4 bg-amber-500 hover:bg-amber-600 text-slate-950 font-extrabold text-lg rounded-2xl shadow-lg disabled:opacity-40 transition"
+                >
+                  {paymentType === 'cash' ? 'Complete Payment' : 'Record Utang'}
+                </button>
+              </div>
             </div>
           </div>
         )}
@@ -922,7 +933,7 @@ export function CashierScreen() {
         {/* Receipt Modal */}
         {receipt && (
           <div className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4">
-            <div className="printable-receipt bg-white rounded-3xl max-w-md w-full p-8 shadow-2xl space-y-6" ref={receiptCardRef}>
+            <div className="printable-receipt bg-white rounded-3xl max-w-md w-full p-8 shadow-2xl space-y-6 max-h-[calc(100dvh-2rem)] overflow-y-auto" ref={receiptCardRef}>
               <div className="text-center border-b pb-4">
                 <p className="text-4xl mb-2">🎉</p>
                 <h3 className="text-2xl font-black text-slate-900">Transaction Complete!</h3>
@@ -1061,7 +1072,7 @@ export function CashierScreen() {
 
       {notFound && (
         <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl w-full max-w-md p-6 shadow-2xl">
+          <div className="bg-white rounded-2xl w-full max-w-md p-6 shadow-2xl max-h-[calc(100dvh-2rem)] overflow-y-auto">
             <div className="mb-4">
               <h3 className="text-xl font-bold text-slate-800">
                 {seedPrefill ? 'Product Recognised' : 'New Barcode Detected'}
@@ -1194,12 +1205,20 @@ export function CashierScreen() {
 
       {/* Checkout Modal */}
       {checkoutOpen && (
-        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl space-y-6" ref={checkoutCardRef}>
-            <div className="flex justify-between items-center border-b pb-4">
+        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-3">
+          <div
+            className="bg-white w-full max-w-md rounded-3xl shadow-2xl flex flex-col max-h-[calc(100dvh-1.5rem)]"
+            ref={checkoutCardRef}
+          >
+            <div className="flex justify-between items-center gap-3 border-b px-6 pt-5 pb-4 shrink-0">
               <h3 className="text-xl font-bold text-slate-900">Process Checkout</h3>
-              <button onClick={closeCheckout} aria-label="Close checkout" className="w-11 h-11 rounded-full bg-slate-100 flex items-center justify-center font-bold">✕</button>
+              <button onClick={closeCheckout} aria-label="Close checkout" className="w-11 h-11 shrink-0 rounded-full bg-slate-100 flex items-center justify-center font-bold">✕</button>
             </div>
+
+            {/* Scrollable body. The pay button lives in the sticky footer below so it
+                is always on screen — on short landscape displays (1280x800 tablets)
+                the form alone is taller than the viewport. */}
+            <div className="flex-1 min-h-0 overflow-y-auto px-6 py-5 space-y-5">
 
             <div>
               <p className="text-sm text-slate-500 mb-1">Subtotal</p>
@@ -1374,18 +1393,21 @@ export function CashierScreen() {
             {checkoutError && (
               <p className="text-sm text-red-600 bg-red-50 rounded-xl p-3">{checkoutError}</p>
             )}
-            
-            <button
-              onClick={handleCheckout}
-              disabled={
-                paymentType === 'cash'
-                  ? !cashTendered || Math.round(parseFloat(cashTendered) * 100) < total
-                  : !selectedCustomerId
-              }
-              className="w-full py-4 bg-amber-500 hover:bg-amber-600 text-slate-900 font-extrabold text-lg rounded-2xl shadow-lg disabled:opacity-40 transition"
-            >
-              {paymentType === 'cash' ? 'Complete Payment' : 'Record Utang'}
-            </button>
+            </div>
+
+            <div className="px-6 pb-5 pt-2 shrink-0">
+              <button
+                onClick={handleCheckout}
+                disabled={
+                  paymentType === 'cash'
+                    ? !cashTendered || Math.round(parseFloat(cashTendered) * 100) < total
+                    : !selectedCustomerId
+                }
+                className="w-full min-h-[52px] py-4 bg-amber-500 hover:bg-amber-600 text-slate-950 font-extrabold text-lg rounded-2xl shadow-lg disabled:opacity-40 transition"
+              >
+                {paymentType === 'cash' ? 'Complete Payment' : 'Record Utang'}
+              </button>
+            </div>
           </div>
         </div>
       )}
@@ -1393,7 +1415,7 @@ export function CashierScreen() {
       {/* Receipt Modal */}
       {receipt && (
         <div className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4">
-          <div className="printable-receipt bg-white rounded-3xl max-w-md w-full p-8 shadow-2xl space-y-6" ref={receiptCardRef}>
+          <div className="printable-receipt bg-white rounded-3xl max-w-md w-full p-8 shadow-2xl space-y-6 max-h-[calc(100dvh-2rem)] overflow-y-auto" ref={receiptCardRef}>
             <div className="text-center border-b pb-4">
               <p className="text-4xl mb-2">🎉</p>
               <h3 className="text-2xl font-black text-slate-900">Transaction Complete!</h3>
