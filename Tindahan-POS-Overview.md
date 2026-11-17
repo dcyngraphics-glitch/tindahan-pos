@@ -16,6 +16,8 @@ Two people can use it at the same time on two devices — one serving customers 
 - Sales dashboard with revenue, profit, and top-product reports
 - Thermal receipt printing, plus receipt reprinting
 - Full transaction history with voiding and automatic stock restoration
+- Credit sales (*utang*) with a customer debt tracker and part-payments
+- Sell rice, animal feed and other bulk goods by weight
 - Customer-facing display for a second screen or TV
 - Works offline and syncs when the connection returns
 - No passwords to remember — sign in with a one-time code sent to email
@@ -29,7 +31,7 @@ Two people can use it at the same time on two devices — one serving customers 
 
 **Two roles, one system.** Every sign-in picks a role, and each role sees only the tools it needs:
 
-- **Cashier** — the till. Checkout, barcode scanning, transaction history, inventory, dashboard, receipt printing.
+- **Cashier** — the till. Checkout, barcode scanning, credit sales (*utang*), transaction history, inventory, dashboard, receipt printing.
 - **Inventory Staff** — stock work. Barcode scanning, the product catalogue, transaction history and the dashboard, without the checkout screen.
 
 **Cashier shift lock.** An optional 4-digit PIN can be set. Once set, the till asks for it every time the app is opened in the Cashier role, so a shared tablet cannot be tapped into by accident. This is a convenience lock, not a security control — anyone alone with the tablet can get past it from the browser. For real protection, use a tablet passcode and sign out between shifts. If no PIN is set, the till opens straight away.
@@ -43,6 +45,10 @@ Two people can use it at the same time on two devices — one serving customers 
 **Barcode checkout.** Scan an item and it lands in the cart instantly. The cart shows each item's name, unit price, quantity and line total, with a running total at the bottom.
 
 **Quantity controls.** Increase or decrease the quantity of any line, or remove it entirely. The system will not let you sell more than the stock on hand, and it re-checks stock when the sale is completed.
+
+**Selling by weight (crops and feed).** Rice, animal feed and similar bulk goods can be flagged as sold by weight. Scanning or tapping one opens a weight keypad: the cashier reads the kilo figure off the scale and types it in, and the line is priced at that product's price per kilo. The per-kilo price can be adjusted for that line if a price is ever negotiated, and the line total rounds to the nearest peso. A weighed line can be re-weighed from the cart.
+
+**Cash or credit.** Every sale is either paid in cash or recorded as *utang* (credit). Choosing credit asks for a customer — pick one from the list or add a new one on the spot — and the sale is saved as a debt for that customer (see *Credit sales and utang* below). Stock is reduced either way, exactly as for a cash sale.
 
 **QuickTap fast keys.** Frequently sold items can be pinned to a grid of large buttons showing the product name, price and current stock. Tapping a tile adds it to the cart in one touch — designed for items customers ask for by name rather than by barcode. Items pinned to QuickTap can be managed from a searchable picker, including a filter that shows budget items at ₱30 and under.
 
@@ -74,7 +80,7 @@ Tindahan POS supports three ways to read a barcode, and they can be used togethe
 
 ## 4. Inventory management
 
-**Full product catalogue.** Each product has a barcode, name, selling price, cost price, stock on hand, and an optional category. Products can be added, edited and deleted.
+**Full product catalogue.** Each product has a barcode, name, selling price, cost price, stock on hand, and an optional category. Products can be added, edited and deleted. A product can be flagged as sold by weight, which prices it per kilo at the till instead of per piece.
 
 **Live stock tracking.** Stock falls automatically when a sale is completed, and rises again when a transaction is voided. You never have to adjust stock by hand after a sale.
 
@@ -106,7 +112,23 @@ Tindahan POS supports three ways to read a barcode, and they can be used togethe
 
 ---
 
-## 6. Dashboard and reports
+## 6. Credit sales and utang (debt tracking)
+
+**Sell now, collect later.** A sale rung up as *utang* is recorded against a customer, and the amount owed is tracked until it is paid.
+
+**Customers.** Customers are simple records — a name, an optional phone number and an optional note. Each customer in the list shows what they currently owe, and the total outstanding across all customers appears at the top of the Utang screen.
+
+**Debt list.** Every credit sale appears with its balance and a status of unpaid, partially paid, or paid in full. Debts can be searched by customer name and filtered by status.
+
+**Taking payments.** Open a debt to see its items and full payment history, then record a part-payment or settle the balance in one tap. A payment entered by mistake can be removed, which adds the amount back to the balance.
+
+**Cashier only.** Credit sales belong to the till. The Inventory Staff role does not see the Utang screen.
+
+**Stock is still reduced.** A credit sale reduces stock exactly like a cash sale — only the payment is deferred.
+
+---
+
+## 7. Dashboard and reports
 
 **Real-time business numbers.** The dashboard shows total revenue, gross profit, profit margin, average basket value, and the number of completed sales.
 
@@ -122,7 +144,7 @@ Tindahan POS supports three ways to read a barcode, and they can be used togethe
 
 ---
 
-## 7. Receipts and printing
+## 8. Receipts and printing
 
 **Thermal receipt printing.** The system prints to common 58mm Bluetooth thermal receipt printers (including GOOJPRT, MPT, RP and similar ESC/POS models) directly from the browser — no separate software or driver install needed.
 
@@ -136,17 +158,17 @@ Tindahan POS supports three ways to read a barcode, and they can be used togethe
 
 ---
 
-## 8. Customer-facing display
+## 9. Customer-facing display
 
 A separate display view is designed for a second screen, tablet or TV facing the customer. It shows the store name and a welcome message while idle, then switches to show each item as it is added to the cart along with a running total, so the customer can follow the sale as it happens. It updates live on the same device or from another device on the same account.
 
 ---
 
-## 9. Devices, hardware and sync
+## 10. Devices, hardware and sync
 
 **Runs anywhere.** Tindahan POS is a web application. It works on Android phones and tablets, iPhones and iPads, and Windows, Mac or Linux computers, in current versions of Chrome, Edge and Safari.
 
-**Installable.** It can be added to a home screen or installed like a normal app, and it opens full-screen without the browser's address bar.
+**Installable.** On Android, iPhone and desktop it can be installed like a normal app and opens full-screen without the browser's address bar. On Android, open the app in Chrome and use the browser menu's *Add to Home screen* / *Install app*. If an older tablet does not offer install, the app still runs normally in the browser — nothing is lost.
 
 **Offline-first.** Sales and stock changes are stored on the device itself. If the internet drops mid-shift, the till keeps working; everything syncs automatically once the connection returns. A sale is never lost because of a bad connection.
 
@@ -163,7 +185,7 @@ A separate display view is designed for a second screen, tablet or TV facing the
 
 ---
 
-## 10. Settings
+## 11. Settings
 
 **Receipt template.** Store name, address, contact information, receipt heading and footer message.
 
@@ -173,6 +195,8 @@ A separate display view is designed for a second screen, tablet or TV facing the
 
 **Cashier PIN.** Set or change the 4-digit shift PIN (a convenience lock, not a security control).
 
+**Developer settings.** A full backup of products, sales, customers and credit records can be downloaded and restored from here.
+
 ---
 
 ## What Tindahan POS does not do
@@ -180,7 +204,7 @@ A separate display view is designed for a second screen, tablet or TV facing the
 So expectations are clear from the start:
 
 - **No accounting or bookkeeping.** It reports sales and profit; it does not produce ledgers, VAT returns or financial statements.
-- **No customer accounts.** There is no credit (*utang*) tracking, no customer profiles, and no loyalty or points system.
+- **No loyalty or points system.** Customers exist to track credit; there are no points, rewards, promotions or account balances of any other kind.
 - **No supplier or purchase-order management.** Stock is entered and adjusted in the product catalogue; there is no ordering workflow.
 - **No barcode label printing.** It prints receipts, not product labels.
 - **No multi-branch or multi-store consolidation.** One store, one shared dataset.
@@ -192,7 +216,7 @@ So expectations are clear from the start:
 
 ## Getting started
 
-1. **Open the app** on the counter device and sign in with an email address.
+1. **Open the app** on the counter device — go to `https://dcyngraphics-glitch.github.io/tindahan-pos/` in Chrome — and sign in with an email address.
 2. **Pick the Cashier role** at the counter, and the **Inventory Staff role** on the stock device.
 3. **Add products** — scan a barcode and accept the suggestion, or type the details in.
 4. **Pin fast movers to QuickTap** for one-tap selling.
@@ -200,4 +224,4 @@ So expectations are clear from the start:
 6. **Open the customer display** on a second screen if one is available.
 7. **Start selling.**
 
-No installation, no server and no passwords are required. A full backup of your products, sales, customers and credit records can be downloaded from the settings screen.
+No installation, no server and no passwords are required. A full backup of your products, sales, customers and credit records can be downloaded — and restored — from the developer settings in the menu.
