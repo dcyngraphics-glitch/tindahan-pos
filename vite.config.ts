@@ -62,7 +62,17 @@ export default defineConfig({
     },
     VitePWA({
       registerType: 'autoUpdate',
-      includeAssets: ['favicon.svg', 'icon-192.svg', 'icons.svg'],
+      // Chrome on Android only offers "Install app" when the manifest carries
+      // 192x192 and 512x512 raster PNG icons — an SVG-only manifest (or the
+      // social-icons sprite that used to stand in for the 512 icon) fails the
+      // check silently and no install prompt ever appears.
+      includeAssets: [
+        'favicon.svg',
+        'icon-192.svg',
+        'icon-192.png',
+        'icon-512.png',
+        'icons.svg',
+      ],
       manifest: {
         name: 'Softies Store',
         short_name: 'Softies Store',
@@ -73,8 +83,8 @@ export default defineConfig({
         background_color: '#f8fafc',
         theme_color: '#f59e0b',
         icons: [
-          { src: './icon-192.svg', sizes: '192x192', type: 'image/svg+xml' },
-          { src: './icons.svg', sizes: '512x512', type: 'image/svg+xml' },
+          { src: './icon-192.png', sizes: '192x192', type: 'image/png', purpose: 'any' },
+          { src: './icon-512.png', sizes: '512x512', type: 'image/png', purpose: 'any' },
         ],
       },
       workbox: {

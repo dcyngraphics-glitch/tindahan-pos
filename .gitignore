@@ -11,6 +11,9 @@ node_modules
 dist
 dist-ssr
 *.local
+.env
+.env.*
+!.env.example
 
 # Dexie Cloud local credentials (never commit — `npx dexie-cloud` writes these)
 dexie-cloud.json
@@ -53,5 +56,7 @@ web_modules/
 
 # Local scratch / audit working files (not part of the app)
 scratch/
+.claude/
+.agents/
 
 .vercel
