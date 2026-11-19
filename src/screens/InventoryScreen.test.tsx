@@ -277,10 +277,8 @@ describe('InventoryScreen', () => {
     add('Mid-Priced Item');
     await screen.findByText('Low-Priced Item');
 
-    const sortLabel = screen.getByText('Sort by:');
-    const sortSelect = sortLabel.closest('div')?.querySelector('select');
-    expect(sortSelect).not.toBeNull();
-    fireEvent.change(sortSelect as HTMLSelectElement, { target: { value: 'price-asc' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Sort products by' }));
+    fireEvent.click(await screen.findByRole('option', { name: 'Price (Low → High)' }));
 
     // Lowest price first: "Low-Priced Item" should render on top.
     expect(productCard('Low-Priced Item')).toBeInTheDocument();
@@ -306,10 +304,8 @@ describe('InventoryScreen', () => {
     add('Cat A Two', 'Test Cat A');
     await screen.findByText('Cat A One');
 
-    const categoryLabel = screen.getByText('Category:');
-    const categorySelect = categoryLabel.closest('div')?.querySelector('select');
-    expect(categorySelect).not.toBeNull();
-    fireEvent.change(categorySelect as HTMLSelectElement, { target: { value: 'Test Cat A' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Filter by category' }));
+    fireEvent.click(await screen.findByRole('option', { name: 'Test Cat A' }));
 
     expect(
       screen.getByText((content) => content.includes('Showing 2 of 2 products'))

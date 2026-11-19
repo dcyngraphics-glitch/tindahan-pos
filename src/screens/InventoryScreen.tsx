@@ -6,8 +6,26 @@ import { ProductForm } from '../components/ProductForm';
 import { SARI_SARI_SEED, formatPeso } from '../services/db';
 import { useIsAtLeast } from '../hooks/useResponsive';
 import { useBarcodeScannerListener } from '../hooks/useBarcodeScannerListener';
+import { Dropdown } from '../components/Dropdown';
 
 const PAGE_SIZE = 50;
+
+type SortValue =
+  | 'name-asc'
+  | 'name-desc'
+  | 'price-asc'
+  | 'price-desc'
+  | 'stock-asc'
+  | 'stock-desc';
+
+const SORT_OPTIONS: { value: SortValue; label: string }[] = [
+  { value: 'name-asc', label: 'Alphabetical (A-Z)' },
+  { value: 'name-desc', label: 'Alphabetical (Z-A)' },
+  { value: 'price-asc', label: 'Price (Low → High)' },
+  { value: 'price-desc', label: 'Price (High → Low)' },
+  { value: 'stock-asc', label: 'Stock (Low → High)' },
+  { value: 'stock-desc', label: 'Stock (High → Low)' },
+];
 
 export function InventoryScreen() {
   const isTablet = useIsAtLeast('tablet');
@@ -22,7 +40,7 @@ export function InventoryScreen() {
 
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
   const [deleteConfirmName, setDeleteConfirmName] = useState<string>('');
-  const [sortBy, setSortBy] = useState<'name-asc' | 'name-desc' | 'price-asc' | 'price-desc' | 'stock-asc' | 'stock-desc'>('name-asc');
+  const [sortBy, setSortBy] = useState<SortValue>('name-asc');
   const [categoryFilter, setCategoryFilter] = useState<string>('all');
   const [page, setPage] = useState(1);
 
@@ -214,32 +232,28 @@ export function InventoryScreen() {
             {categories.length > 0 && (
               <div className="flex items-center gap-1">
                 <span>Category:</span>
-                <select
+                <Dropdown
+                  ariaLabel="Filter by category"
                   value={categoryFilter}
-                  onChange={(e) => { setCategoryFilter(e.target.value); setPage(1); }}
-                  className="max-w-full px-2 py-1 min-h-[44px] border border-slate-200 rounded-xl bg-white font-medium text-slate-800"
-                >
-                  <option value="all">All Categories ({products.length})</option>
-                  {categories.map(c => (
-                    <option key={c} value={c}>{c}</option>
-                  ))}
-                </select>
+                  onChange={v => {
+                    setCategoryFilter(v);
+                    setPage(1);
+                  }}
+                  options={[
+                    { value: 'all', label: `All Categories (${products.length})` },
+                    ...categories.map(c => ({ value: c, label: c })),
+                  ]}
+                />
               </div>
             )}
             <div className="flex items-center gap-1">
               <span>Sort by:</span>
-              <select
+              <Dropdown
+                ariaLabel="Sort products by"
                 value={sortBy}
-                onChange={(e) => setSortBy(e.target.value as any)}
-                className="max-w-full px-2 py-1 min-h-[44px] border border-slate-200 rounded-xl bg-white font-medium text-slate-800"
-              >
-                <option value="name-asc">Alphabetical (A-Z)</option>
-                <option value="name-desc">Alphabetical (Z-A)</option>
-                <option value="price-asc">Price (Low → High)</option>
-                <option value="price-desc">Price (High → Low)</option>
-                <option value="stock-asc">Stock (Low → High)</option>
-                <option value="stock-desc">Stock (High → Low)</option>
-              </select>
+                onChange={setSortBy}
+                options={SORT_OPTIONS}
+              />
             </div>
           </div>
         </header>

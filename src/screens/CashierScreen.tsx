@@ -34,6 +34,9 @@ export function CashierScreen() {
   // catalogue, the form opens pre-filled so the cashier only adjusts price and stock.
   const [seedPrefill, setSeedPrefill] = useState<Product | null>(null);
   const [printing, setPrinting] = useState(false);
+  // Receipts are printed automatically after a sale unless the cashier opts out —
+  // a ₱8 biscuit should not cost a foot of thermal paper.
+  const [printReceipt, setPrintReceipt] = useState(true);
   const [quickTapExpanded, setQuickTapExpanded] = useState(isDesktopOrLarger);
   const [products, setProducts] = useState<Product[]>([]);
   const [voidConfirmOpen, setVoidConfirmOpen] = useState(false);
@@ -426,8 +429,8 @@ export function CashierScreen() {
       setDiscountValue('');
       resetCheckout();
 
-      // Auto-print on Bluetooth printer after checkout
-      if (printerConnected) {
+      // Auto-print on Bluetooth printer after checkout, unless the cashier opted out.
+      if (printerConnected && printReceipt) {
         setPrinting(true);
         try {
           await printViaBluetooth({
@@ -527,7 +530,7 @@ export function CashierScreen() {
                   <button
                     onClick={() => connectPrinter()}
                     title="Click to pair/connect Bluetooth printer"
-                    className={`inline-flex items-center gap-1 font-medium hover:underline cursor-pointer ${printerConnected ? 'text-green-600' : 'text-red-600'}`}
+                    className={`inline-flex items-center gap-1 font-medium hover:underline cursor-pointer min-h-[44px] px-2 rounded-lg ${printerConnected ? 'text-green-600' : 'text-red-600'}`}
                   >
                     <span className={`w-2 h-2 rounded-full ${printerConnected ? 'bg-green-500' : 'bg-red-500'}`} />
                     🖨️ {printerConnected ? (printerName || 'Printer Connected') : 'Printer Disconnected'}
@@ -770,6 +773,24 @@ export function CashierScreen() {
                 </div>
               </div>
 
+              {/* Receipt printing — the cashier can skip paper for tiny purchases. */}
+              <div className="flex items-center justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="text-sm font-bold text-slate-800">Print receipt</p>
+                  <p className="text-xs text-slate-500">Turn off for small purchases to save paper.</p>
+                </div>
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={printReceipt}
+                  aria-label="Print receipt"
+                  onClick={() => setPrintReceipt(v => !v)}
+                  className={`shrink-0 w-14 h-8 rounded-full transition-colors relative ${printReceipt ? 'bg-amber-500' : 'bg-slate-300'}`}
+                >
+                  <span className={`absolute top-1 w-6 h-6 rounded-full bg-white shadow transition-all ${printReceipt ? 'left-7' : 'left-1'}`} />
+                </button>
+              </div>
+              
               {paymentType === 'cash' ? (
                 <>
                   <div>
@@ -1276,6 +1297,24 @@ export function CashierScreen() {
               </div>
             </div>
 
+            {/* Receipt printing — the cashier can skip paper for tiny purchases. */}
+            <div className="flex items-center justify-between gap-3">
+              <div className="min-w-0">
+                <p className="text-sm font-bold text-slate-800">Print receipt</p>
+                <p className="text-xs text-slate-500">Turn off for small purchases to save paper.</p>
+              </div>
+              <button
+                type="button"
+                role="switch"
+                aria-checked={printReceipt}
+                aria-label="Print receipt"
+                onClick={() => setPrintReceipt(v => !v)}
+                className={`shrink-0 w-14 h-8 rounded-full transition-colors relative ${printReceipt ? 'bg-amber-500' : 'bg-slate-300'}`}
+              >
+                <span className={`absolute top-1 w-6 h-6 rounded-full bg-white shadow transition-all ${printReceipt ? 'left-7' : 'left-1'}`} />
+              </button>
+            </div>
+            
             {paymentType === 'cash' ? (
               <>
                 <div>

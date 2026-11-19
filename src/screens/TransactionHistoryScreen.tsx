@@ -99,7 +99,7 @@ export function TransactionHistoryScreen() {
         <button
           onClick={loadTransactions}
           disabled={loading}
-          className="px-4 py-2 bg-slate-100 hover:bg-slate-200 disabled:opacity-50 text-slate-700 text-sm font-medium rounded-xl transition"
+          className="px-4 py-2 min-h-[44px] bg-slate-100 hover:bg-slate-200 disabled:opacity-50 text-slate-700 text-sm font-medium rounded-xl transition"
         >
           {loading ? 'Refreshing...' : '↻ Refresh'}
         </button>
@@ -118,19 +118,19 @@ export function TransactionHistoryScreen() {
           <div className="flex bg-slate-200 p-1 rounded-xl text-xs font-bold">
             <button
               onClick={() => setFilter('all')}
-              className={`px-3 py-1.5 rounded-lg transition ${filter === 'all' ? 'bg-white shadow text-slate-900' : 'text-slate-600'}`}
+              className={`px-3 py-1.5 rounded-lg transition min-h-[44px] ${filter === 'all' ? 'bg-white shadow text-slate-900' : 'text-slate-600'}`}
             >
               All ({transactions.length})
             </button>
             <button
               onClick={() => setFilter('valid')}
-              className={`px-3 py-1.5 rounded-lg transition ${filter === 'valid' ? 'bg-white shadow text-slate-900' : 'text-slate-600'}`}
+              className={`px-3 py-1.5 rounded-lg transition min-h-[44px] ${filter === 'valid' ? 'bg-white shadow text-slate-900' : 'text-slate-600'}`}
             >
               Completed ({transactions.filter(t => !t.voided).length})
             </button>
             <button
               onClick={() => setFilter('voided')}
-              className={`px-3 py-1.5 rounded-lg transition ${filter === 'voided' ? 'bg-white shadow text-red-600' : 'text-slate-600'}`}
+              className={`px-3 py-1.5 rounded-lg transition min-h-[44px] ${filter === 'voided' ? 'bg-white shadow text-red-600' : 'text-slate-600'}`}
             >
               Voided ({transactions.filter(t => t.voided).length})
             </button>

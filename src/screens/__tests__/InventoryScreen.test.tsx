@@ -231,10 +231,8 @@ describe('InventoryScreen', () => {
       expect(screen.getByText('Zeta')).toBeInTheDocument();
     });
 
-    await user.selectOptions(
-      screen.getByDisplayValue('Alphabetical (A-Z)'),
-      'name-asc',
-    );
+    await user.click(screen.getByRole('button', { name: 'Sort products by' }));
+    await user.click(await screen.findByRole('option', { name: 'Alphabetical (A-Z)' }));
 
     await waitFor(() => {
       expect(screen.getByText('Alpha')).toBeVisible();
@@ -256,7 +254,8 @@ describe('InventoryScreen', () => {
       expect(screen.getByText('Yakult Manggadios')).toBeInTheDocument();
     });
 
-    await user.selectOptions(screen.getByDisplayValue(/All Categories/), 'Beverages');
+    await user.click(screen.getByRole('button', { name: 'Filter by category' }));
+    await user.click(await screen.findByRole('option', { name: 'Beverages' }));
 
     await waitFor(() => {
       expect(screen.getByText('Yakult Manggadios')).toBeInTheDocument();

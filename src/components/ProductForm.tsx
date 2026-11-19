@@ -226,7 +226,10 @@ function FormBody({
           )}
         </div>
 
-        <div className="flex items-center gap-3 p-3 bg-emerald-50 border border-emerald-200 rounded-xl">
+        <label
+          htmlFor="soldByWeight"
+          className="flex items-center gap-3 p-3 bg-emerald-50 border border-emerald-200 rounded-xl cursor-pointer min-h-[44px]"
+        >
           <input
             type="checkbox"
             id="soldByWeight"
@@ -234,12 +237,15 @@ function FormBody({
             onChange={(e) => setSoldByWeight(e.target.checked)}
             className="w-5 h-5 text-emerald-600 rounded border-slate-300 focus:ring-emerald-500"
           />
-          <label htmlFor="soldByWeight" className="text-sm font-medium text-slate-800 cursor-pointer">
+          <span className="text-sm font-medium text-slate-800">
             Sold by weight <span className="block text-xs text-slate-500">Rice, animal feed and other crops priced per kilo. Stock is not tracked.</span>
-          </label>
-        </div>
+          </span>
+        </label>
 
-        <div className="flex items-center gap-3 p-3 bg-amber-50 border border-amber-200 rounded-xl">
+        <label
+          htmlFor="isQuickTap"
+          className="flex items-center gap-3 p-3 bg-amber-50 border border-amber-200 rounded-xl cursor-pointer min-h-[44px]"
+        >
           <input
             type="checkbox"
             id="isQuickTap"
@@ -247,10 +253,10 @@ function FormBody({
             onChange={(e) => setIsQuickTap(e.target.checked)}
             className="w-5 h-5 text-amber-500 rounded border-slate-300 focus:ring-amber-500"
           />
-          <label htmlFor="isQuickTap" className="text-sm font-medium text-slate-800 cursor-pointer">
+          <span className="text-sm font-medium text-slate-800">
             Pin to Quick Tap (show on Cashier screen for fast tapping)
-          </label>
-        </div>
+          </span>
+        </label>
 
         <div className="flex gap-2 pt-2">
           <button
