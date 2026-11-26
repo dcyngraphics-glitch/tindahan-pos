@@ -18,6 +18,8 @@ import { LoginScreen } from './components/LoginScreen';
 import { seedCatalogIfEmpty, E2E_MODE } from './services/db';
 import { getLowStockProducts } from './services/products';
 import { useIsAtLeast } from './hooks/useResponsive';
+import { useAccessGate } from './hooks/useAccessGate';
+import { AccessGateScreen } from './components/AccessGateScreen';
 
 // recharts is heavy and only the dashboard uses it, so it is fetched when the
 // dashboard opens instead of on every page load.
@@ -42,9 +44,13 @@ export default function App() {
  * every cold start for users who are perfectly well signed in.
  */
 function AuthGate() {
-  const { isLoading, isLoggedIn, error } = useCloudSession();
+  const { isLoading, isLoggedIn, error, email } = useCloudSession();
   const { role: storedRole } = useAuthStore();
   const [isCustomerView, setIsCustomerView] = useState(window.location.hash === '#customer');
+  const showMain = isLoggedIn || (E2E_MODE && storedRole !== null);
+  // Tests run the app from a seeded role with no Dexie/Jonard session, so the
+  // owner-approval gate is bypassed only there; every real sign-in is checked.
+  const access = useAccessGate(email, showMain && !E2E_MODE);
 
   useEffect(() => {
     const syncFromUrl = () => {
@@ -66,16 +72,17 @@ function AuthGate() {
     return <CustomerDisplay />;
   }
 
-  // E2E_MODE (see services/db.ts) renders the main app from the seeded `tindahan_auth`
-  // role instead of waiting for a cloud session no test can complete. Tying it to the
-  // seeded role (rather than to the flag alone) is what lets the logout tests work:
-  // once logout clears the role, the gate falls back to the login screen.
-  const showMain = isLoggedIn || (E2E_MODE && storedRole !== null);
-
   return (
     <>
-      {showMain ? (
+      {showMain && access.decision === 'allowed' ? (
         <MainApp />
+      ) : showMain ? (
+        <AccessGateScreen
+          email={email}
+          decision={access.decision === 'allowed' ? 'checking' : access.decision}
+          reason={access.reason}
+          onRetry={access.retry}
+        />
       ) : isLoading ? (
         <div className="min-h-dvh bg-gradient-to-br from-amber-500 via-amber-600 to-slate-900 flex items-center justify-center p-4">
           <p className="text-white text-lg font-extrabold">Loading...</p>
