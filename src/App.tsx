@@ -20,6 +20,7 @@ import { getLowStockProducts } from './services/products';
 import { useIsAtLeast } from './hooks/useResponsive';
 import { useAccessGate } from './hooks/useAccessGate';
 import { AccessGateScreen } from './components/AccessGateScreen';
+import { GateNoticeBanner } from './components/GateNotice';
 
 // recharts is heavy and only the dashboard uses it, so it is fetched when the
 // dashboard opens instead of on every page load.
@@ -75,12 +76,20 @@ function AuthGate() {
   return (
     <>
       {showMain && access.decision === 'allowed' ? (
-        <MainApp />
+        <>
+          <MainApp />
+          {/* Mounted outside MainApp so a block-severity notice also covers the
+              cashier PIN gate, and console notices reach the user on every screen. */}
+          {access.notice && (
+            <GateNoticeBanner notice={access.notice} onDismiss={access.dismissNotice} />
+          )}
+        </>
       ) : showMain ? (
         <AccessGateScreen
           email={email}
           decision={access.decision === 'allowed' ? 'checking' : access.decision}
           reason={access.reason}
+          serviceError={access.serviceError}
           onRetry={access.retry}
         />
       ) : isLoading ? (
